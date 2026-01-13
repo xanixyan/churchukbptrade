@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(cmd /c \"npm install\")",
+      "Bash(cmd /c \"npm --version\")",
+      "Bash(powershell -Command \"npm --version\")"
+    ]
+  }
+}
