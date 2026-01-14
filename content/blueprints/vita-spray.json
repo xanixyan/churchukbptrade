@@ -3,6 +3,8 @@
   "name": "Vita Spray",
   "slug": "vita-spray",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/f/f5/Vita_Spray_Blueprint.png",
+  "type": "Heals",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

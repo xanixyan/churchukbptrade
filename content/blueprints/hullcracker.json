@@ -3,6 +3,8 @@
   "name": "Hullcracker",
   "slug": "hullcracker",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/5/58/Hullcracker_Blueprint.png",
+  "type": "Guns",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

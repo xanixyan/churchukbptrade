@@ -4,7 +4,11 @@
       "Bash(npm install)",
       "Bash(cmd /c \"npm install\")",
       "Bash(cmd /c \"npm --version\")",
-      "Bash(powershell -Command \"npm --version\")"
+      "Bash(powershell -Command \"npm --version\")",
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(node -e:*)",
+      "Bash(node scripts/add-types.mjs:*)"
     ]
   }
 }

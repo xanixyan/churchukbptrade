@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
+  output: "standalone",
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -10,7 +10,6 @@ const nextConfig = {
       },
     ],
   },
-  trailingSlash: true,
 };
 
 export default nextConfig;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Blueprint } from "@/lib/types";
+import { Blueprint, getMaxSelectableQty } from "@/lib/types";
 import QuantitySelector from "./QuantitySelector";
 
 interface BlueprintCardProps {
@@ -22,9 +22,12 @@ export default function BlueprintCard({
   onToggleSelect,
   onQuantityChange,
 }: BlueprintCardProps) {
+  const maxQty = getMaxSelectableQty(blueprint);
+  const canSelect = maxQty > 0;
+
   // Handle click in select mode
   const handleClick = (e: React.MouseEvent) => {
-    if (selectMode && onToggleSelect) {
+    if (selectMode && onToggleSelect && canSelect) {
       e.preventDefault();
       onToggleSelect(blueprint);
     }
@@ -33,7 +36,9 @@ export default function BlueprintCard({
   // Handle quantity change
   const handleQuantityChange = (newQuantity: number) => {
     if (onQuantityChange) {
-      onQuantityChange(blueprint, newQuantity);
+      // Clamp to max available
+      const clampedQty = Math.min(Math.max(1, newQuantity), maxQty);
+      onQuantityChange(blueprint, clampedQty);
     }
   };
 
@@ -41,7 +46,7 @@ export default function BlueprintCard({
     <div
       className={`gamer-card bg-dark-800 rounded-lg overflow-hidden ${
         isSelected ? "ring-2 ring-neon-cyan shadow-neon" : ""
-      }`}
+      } ${selectMode && !canSelect ? "opacity-50" : ""}`}
     >
       {/* Image */}
       <div
@@ -64,7 +69,7 @@ export default function BlueprintCard({
         )}
 
         {/* Select mode checkbox */}
-        {selectMode && (
+        {selectMode && canSelect && (
           <div className="absolute top-2 left-2">
             <div
               className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
@@ -89,10 +94,14 @@ export default function BlueprintCard({
           </div>
         )}
 
-        {/* Owned badge (move down when in select mode) */}
-        {blueprint.owned && !selectMode && (
-          <div className="absolute top-2 right-2 px-2 py-1 bg-neon-cyan/20 text-neon-cyan text-xs font-bold rounded border border-neon-cyan/40">
-            Є В НАЯВНОСТІ
+        {/* Owned badge with quantity (not in select mode) */}
+        {!selectMode && (
+          <div className={`absolute top-2 right-2 px-2 py-1 text-xs font-bold rounded border ${
+            blueprint.ownedQty > 0
+              ? "bg-neon-cyan/20 text-neon-cyan border-neon-cyan/40"
+              : "bg-gray-800/80 text-gray-500 border-gray-600"
+          }`}>
+            {blueprint.ownedQty > 0 ? `×${blueprint.ownedQty}` : "Немає"}
           </div>
         )}
       </div>
@@ -104,13 +113,19 @@ export default function BlueprintCard({
 
         {/* Quantity selector when selected in select mode */}
         {selectMode && isSelected && (
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-gray-400">К-сть:</span>
-            <QuantitySelector
-              quantity={quantity}
-              onChange={handleQuantityChange}
-              size="sm"
-            />
+          <div className="mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">К-сть:</span>
+              <QuantitySelector
+                quantity={quantity}
+                onChange={handleQuantityChange}
+                size="sm"
+                max={maxQty}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1 text-right">
+              Доступно: {maxQty}
+            </p>
           </div>
         )}
       </div>
@@ -120,7 +135,10 @@ export default function BlueprintCard({
   // In select mode, use div with onClick; otherwise use Link
   if (selectMode) {
     return (
-      <div className="block cursor-pointer" onClick={handleClick}>
+      <div
+        className={`block ${canSelect ? "cursor-pointer" : "cursor-not-allowed"}`}
+        onClick={handleClick}
+      >
         {cardContent}
       </div>
     );

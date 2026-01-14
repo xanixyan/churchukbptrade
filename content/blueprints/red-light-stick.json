@@ -3,6 +3,8 @@
   "name": "Red Light Stick",
   "slug": "red-light-stick",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/2/28/Red_Light_Stick_Blueprint.png",
-  "owned": false,
+  "type": "Utility",
+  "owned": true,
+  "ownedQty": 2,
   "notes": ""
 }

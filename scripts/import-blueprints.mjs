@@ -466,13 +466,19 @@ async function importBlueprints() {
     const existing = readExistingBlueprint(bp.slug);
 
     // Build blueprint object
+    // PRESERVE existing owned, ownedQty, type, and notes
+    const existingOwned = existing?.owned ?? false;
+    const existingOwnedQty = existing?.ownedQty ?? 0;
+    const existingType = existing?.type ?? "Utility";
+
     const blueprint = {
       id,
       name: bp.name,
       slug: bp.slug,
       image: bp.image || "",
-      // PRESERVE existing owned and notes
-      owned: existing?.owned ?? false,
+      type: existingType,
+      owned: existingOwned,
+      ownedQty: existingOwned ? Math.max(1, existingOwnedQty) : 0,
       notes: existing?.notes ?? "",
     };
 

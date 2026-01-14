@@ -3,6 +3,8 @@
   "name": "Snap Hook",
   "slug": "snap-hook",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/c/c5/Snap_Hook_Blueprint.png",
-  "owned": false,
+  "type": "Utility",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

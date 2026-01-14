@@ -1,30 +1,54 @@
 # churchukbptrade
 
-A dark, gamer-styled storefront for selling ARC Raiders blueprints. No payment processing - purchases are handled via Discord messaging.
+A dark, gamer-styled storefront for selling ARC Raiders blueprints. Orders are sent directly to Telegram.
 
 ## Features
 
 - **Blueprint Catalog**: Browse all available blueprints with search and filters
 - **Blueprint Details**: View individual blueprint info with buy option
-- **Discord Purchase Flow**: Click "Buy" → Copy prefilled message → Send to Discord
-- **Admin Panel**: Decap CMS at `/admin` for owner-only catalog management
-- **Static Export**: Fully static site, deployable to Netlify
+- **Telegram Orders**: Select blueprints, enter your Discord nick, submit - order goes to Telegram
+- **Anti-spam Protection**: Rate limiting and honeypot fields
+- **Docker Ready**: Easy deployment with Docker
 
 ## Tech Stack
 
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
-- Decap CMS (formerly Netlify CMS)
-- Netlify Identity + Git Gateway
+- Telegram Bot API
 
-## Local Development
+## Quick Start
+
+### 1. Clone and Install
 
 ```bash
-# Install dependencies
+git clone https://github.com/YOUR_USERNAME/churchukbptrade.git
+cd churchukbptrade
 npm install
+```
 
-# Run development server
+### 2. Set Up Telegram Bot
+
+1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+2. Send `/newbot` and follow the prompts
+3. Copy the bot token (looks like `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+4. Message [@userinfobot](https://t.me/userinfobot) to get your chat ID
+
+### 3. Configure Environment
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+```
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_ADMIN_CHAT_ID=your_chat_id_here
+```
+
+### 4. Run Development Server
+
+```bash
 npm run dev
 ```
 
@@ -34,30 +58,32 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ```
 ├── app/
-│   ├── layout.tsx       # Root layout with header/footer
-│   ├── page.tsx         # Catalog page (/)
-│   ├── globals.css      # Global styles + Tailwind
+│   ├── api/
+│   │   └── order/
+│   │       └── route.ts     # Order API endpoint
+│   ├── layout.tsx           # Root layout with header/footer
+│   ├── page.tsx             # Catalog page (/)
+│   ├── globals.css          # Global styles + Tailwind
 │   └── bp/[slug]/
-│       └── page.tsx     # Blueprint detail page
+│       └── page.tsx         # Blueprint detail page
 ├── components/
 │   ├── Header.tsx
 │   ├── Footer.tsx
 │   ├── BlueprintCard.tsx
 │   ├── BlueprintGrid.tsx
-│   ├── BlueprintDetail.tsx
+│   ├── CheckoutModal.tsx    # Order form modal
 │   ├── CatalogControls.tsx
-│   └── BuyModal.tsx
+│   ├── QuantitySelector.tsx
+│   └── SelectionBar.tsx
 ├── lib/
-│   ├── types.ts         # TypeScript interfaces
-│   └── blueprints.ts    # Blueprint loading functions
+│   ├── types.ts             # TypeScript interfaces
+│   ├── blueprints.ts        # Blueprint loading functions
+│   ├── order.ts             # Order validation & Telegram
+│   └── rate-limit.ts        # Rate limiting
 ├── content/
-│   └── blueprints/      # JSON files for each blueprint
-├── public/
-│   └── admin/
-│       ├── index.html   # Decap CMS entry
-│       └── config.yml   # CMS configuration
+│   └── blueprints/          # JSON files for each blueprint
 └── scripts/
-    └── fandom-scrape.mjs # Optional wiki scraper
+    └── import-blueprints.mjs # Wiki importer
 ```
 
 ## Blueprint JSON Format
@@ -75,44 +101,130 @@ Each blueprint is stored as a JSON file in `content/blueprints/`:
 }
 ```
 
-## Deploy to Netlify
+## Docker Deployment
 
-### Step 1: Push to GitHub
+### Quick Start (Production)
 
 ```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/churchukbptrade.git
-git push -u origin main
+# Build and run
+docker-compose up -d
+
+# Site is available at http://localhost:3000
 ```
 
-### Step 2: Deploy on Netlify
+### Development with Docker
 
-1. Go to [Netlify](https://app.netlify.com)
-2. Click "Add new site" → "Import an existing project"
-3. Connect your GitHub repository
-4. Build settings (should auto-detect):
-   - **Build command**: `npm run build`
-   - **Publish directory**: `out`
-5. Click "Deploy site"
+```bash
+# Run with hot reload
+docker-compose -f docker-compose.dev.yml up
 
-### Step 3: Enable Identity & Git Gateway
+# Site is available at http://localhost:3000 with live reload
+```
 
-1. In Netlify dashboard, go to **Site settings** → **Identity**
-2. Click **Enable Identity**
-3. Under **Registration**, select **Invite only** (recommended)
-4. Under **Services** → **Git Gateway**, click **Enable Git Gateway**
-5. Go to **Identity** tab and click **Invite users**
-6. Invite yourself (your email)
+### Manual Docker Commands
 
-### Step 4: Accept Invite & Access Admin
+```bash
+# Build production image
+docker build -t churchukbptrade .
 
-1. Check your email for the invite
-2. Click the invite link and set your password
-3. Go to `https://your-site.netlify.app/admin/`
-4. Log in with your credentials
-5. You can now add/edit/delete blueprints!
+# Run container with environment variables
+docker run -d -p 3000:3000 \
+  -e TELEGRAM_BOT_TOKEN=your_token \
+  -e TELEGRAM_ADMIN_CHAT_ID=your_chat_id \
+  --name churchukbptrade \
+  churchukbptrade
+
+# View logs
+docker logs churchukbptrade
+
+# Stop and remove
+docker stop churchukbptrade && docker rm churchukbptrade
+```
+
+### Docker Files
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Production multi-stage build |
+| `Dockerfile.dev` | Development with hot reload |
+| `docker-compose.yml` | Production orchestration |
+| `docker-compose.dev.yml` | Development orchestration |
+| `.dockerignore` | Files excluded from build |
+
+## Deploy with Cloudflare
+
+### Option 1: VPS + Docker + Cloudflare DNS
+
+#### Step 1: Set up VPS
+
+```bash
+# On your VPS (Ubuntu/Debian)
+sudo apt update
+sudo apt install docker.io docker-compose git
+
+# Clone your repo
+git clone https://github.com/YOUR_USERNAME/churchukbptrade.git
+cd churchukbptrade
+
+# Create .env.local with your Telegram credentials
+cat > .env.local << EOF
+TELEGRAM_BOT_TOKEN=your_token_here
+TELEGRAM_ADMIN_CHAT_ID=your_chat_id_here
+EOF
+
+# Build and run
+docker-compose up -d
+```
+
+#### Step 2: Configure Cloudflare DNS
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. Select your domain → **DNS**
+3. Add an **A record**:
+   - **Name**: `@` (or `www`)
+   - **IPv4 address**: Your VPS IP
+   - **Proxy status**: Proxied (orange cloud)
+4. Save
+
+#### Step 3: Enable HTTPS (Cloudflare handles this)
+
+1. Go to **SSL/TLS** → **Overview**
+2. Set mode to **Full** (or **Full (strict)** if you have SSL on server)
+
+Your site is now live at `https://yourdomain.com`!
+
+### Option 2: Cloudflare Tunnel (No open ports)
+
+For maximum security - no need to expose ports:
+
+```bash
+# Install cloudflared on your server
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+chmod +x cloudflared
+sudo mv cloudflared /usr/local/bin/
+
+# Authenticate
+cloudflared tunnel login
+
+# Create tunnel
+cloudflared tunnel create churchukbptrade
+
+# Configure tunnel (creates config)
+cat > ~/.cloudflared/config.yml << EOF
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /root/.cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: yourdomain.com
+    service: http://localhost:3000
+  - service: http_status:404
+EOF
+
+# Run tunnel
+cloudflared tunnel run churchukbptrade
+```
+
+Then add a CNAME record in Cloudflare DNS pointing to `YOUR_TUNNEL_ID.cfargotunnel.com`.
 
 ## Importing Blueprints from Fandom
 
@@ -125,89 +237,10 @@ npm run import:blueprints
 ```
 
 This will:
-1. Fetch the Fandom wiki page: `https://arc-raiders.fandom.com/wiki/Blueprints`
-2. Parse all blueprint names and high-resolution image URLs
+1. Fetch the Fandom wiki page
+2. Parse all blueprint names and image URLs
 3. Generate one JSON file per blueprint in `content/blueprints/`
 4. **Preserve** your existing `owned` and `notes` values
-
-### What Gets Created
-
-For each blueprint, a file like `content/blueprints/anvil.json`:
-
-```json
-{
-  "id": "BP-001",
-  "name": "Anvil",
-  "slug": "anvil",
-  "image": "https://static.wikia.nocookie.net/arc-raiders/images/.../Anvil.png",
-  "owned": false,
-  "notes": ""
-}
-```
-
-- **IDs**: `BP-001`, `BP-002`, etc. (alphabetical order by name)
-- **Slugs**: Lowercase, hyphens instead of spaces
-- **Images**: Highest resolution available from Fandom CDN
-- **Default**: `owned: false`, `notes: ""`
-
-### Sample Output
-
-```
-╔══════════════════════════════════════════════════════════════╗
-║         ARC Raiders Blueprint Importer                       ║
-║         Source: arc-raiders.fandom.com                       ║
-╚══════════════════════════════════════════════════════════════╝
-
-📡 Fetching: https://arc-raiders.fandom.com/wiki/Blueprints
-  ✓ Fetched 156.2 KB
-
-🔍 Parsing Fandom wiki page...
-  Found 2 tables, extracted 45 blueprints
-  ✓ Total blueprints found: 45
-
-📝 Writing blueprint files...
-  + Anvil (anvil)
-  + Assault Rifle (assault-rifle)
-  + Combat Armor (combat-armor)
-  ...
-
-╔══════════════════════════════════════════════════════════════╗
-║                     Import Complete                          ║
-╚══════════════════════════════════════════════════════════════╝
-
-  📊 Summary:
-     Total blueprints: 45
-     Created:          42
-     Updated:          3
-     Unchanged:        0
-
-  🖼️  Images:
-     With image:    40
-     Without image: 5
-```
-
-### Safe Update Logic
-
-When you run the import again:
-
-| Scenario | Action |
-|----------|--------|
-| New blueprint on wiki | Creates new file |
-| Existing file, data changed | Updates `id`, `name`, `image`, `slug` only |
-| Existing file, no changes | Skips (unchanged) |
-| Your `owned`/`notes` values | **Always preserved** |
-
-### Updating Your Catalog
-
-When the wiki adds new blueprints:
-
-```bash
-npm run import:blueprints
-```
-
-- New blueprints appear with `owned: false`
-- Your marked blueprints stay marked
-- Nothing is deleted automatically
 
 ### After Import
 
@@ -215,26 +248,25 @@ npm run import:blueprints
 2. Edit files to set `owned: true` for blueprints you have
 3. Add pricing/notes as needed
 4. Run `npm run dev` to see the catalog
-5. Or use `/admin` CMS after deployment
 
-### Troubleshooting
-
-**"Could not find blueprint table — update selector"**
-- The Fandom wiki layout may have changed
-- Edit `scripts/import-blueprints.mjs` to update the HTML parsing
-
-**Missing images**
-- Some blueprints may not have images on the wiki yet
-- Add image URLs manually in the JSON files or via CMS
-
-## Purchase Flow
+## Order Flow
 
 1. Visitor browses catalog at `/`
-2. Clicks on a blueprint to see details at `/bp/[slug]`
-3. Clicks "Buy (Copy message)"
-4. Modal opens with prefilled Ukrainian message
-5. Visitor copies message and contacts `churchuk` on Discord
-6. Owner and buyer arrange trade in-game
+2. Clicks blueprints to select them
+3. Adjusts quantities as needed
+4. Clicks "Купити обране" (Buy selected)
+5. Enters Discord nickname and offer
+6. Clicks "Оформити замовлення" (Place order)
+7. Order is sent to your Telegram
+8. You contact the buyer on Discord
+
+## Security Notes
+
+- **NEVER** commit `.env.local` or any file containing tokens
+- The `.gitignore` is configured to ignore `.env*.local` and `.env`
+- Rate limiting: 3 orders per 5 minutes per IP
+- Honeypot field to catch bots
+- Input validation on both client and server
 
 ## Customization
 
@@ -243,11 +275,6 @@ npm run import:blueprints
 Update the username in:
 - `components/Header.tsx`
 - `components/Footer.tsx`
-- `components/BuyModal.tsx`
-
-### Change Message Template
-
-Edit the `message` variable in `components/BuyModal.tsx`
 
 ### Adjust Styling
 

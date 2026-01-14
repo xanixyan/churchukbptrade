@@ -3,6 +3,8 @@
   "name": "Fireworks Box",
   "slug": "fireworks-box",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/2/22/Fireworks_Box_Blueprint.png",
+  "type": "Utility",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

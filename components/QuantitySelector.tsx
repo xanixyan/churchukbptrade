@@ -5,6 +5,7 @@ interface QuantitySelectorProps {
   onChange: (quantity: number) => void;
   disabled?: boolean;
   size?: "sm" | "md";
+  max?: number;
 }
 
 export default function QuantitySelector({
@@ -12,6 +13,7 @@ export default function QuantitySelector({
   onChange,
   disabled = false,
   size = "sm",
+  max = 999,
 }: QuantitySelectorProps) {
   const handleDecrement = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -22,13 +24,15 @@ export default function QuantitySelector({
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onChange(quantity + 1);
+    if (quantity < max) {
+      onChange(quantity + 1);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     const value = parseInt(e.target.value, 10);
-    if (!isNaN(value) && value >= 1) {
+    if (!isNaN(value) && value >= 1 && value <= max) {
       onChange(value);
     }
   };
@@ -68,7 +72,7 @@ export default function QuantitySelector({
       {/* Quantity input */}
       <input
         type="number"
-        min="1"
+        min="1" max={max}
         value={quantity}
         onChange={handleInputChange}
         onClick={handleClick}
@@ -79,7 +83,7 @@ export default function QuantitySelector({
       {/* Increment button */}
       <button
         onClick={handleIncrement}
-        disabled={disabled}
+        disabled={disabled || quantity >= max}
         className={`${buttonClasses} flex items-center justify-center rounded-r bg-dark-600 text-gray-300 hover:bg-dark-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-dark-500`}
       >
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

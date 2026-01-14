@@ -3,6 +3,8 @@
   "name": "Tagging Grenade",
   "slug": "tagging-grenade",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/d/d7/Tagging_Grenade_Blueprint.png",
+  "type": "Grenades",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

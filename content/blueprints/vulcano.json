@@ -3,6 +3,8 @@
   "name": "Vulcano",
   "slug": "vulcano",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/3/31/Vulcano_Blueprint.png",
-  "owned": false,
+  "type": "Guns",
+  "owned": true,
+  "ownedQty": 2,
   "notes": ""
 }

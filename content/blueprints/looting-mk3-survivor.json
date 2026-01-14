@@ -3,6 +3,8 @@
   "name": "Looting MK.3 (Survivor)",
   "slug": "looting-mk3-survivor",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/b/b3/Looting_MK3_Survivor_Blueprint.png",
+  "type": "Augments",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

@@ -3,6 +3,8 @@
   "name": "Stable Stock III",
   "slug": "stable-stock-iii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/6/6f/Stable_Stock_III_Blueprint.png",
+  "type": "Attachments",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

@@ -3,6 +3,8 @@
   "name": "Shotgun Choke III",
   "slug": "shotgun-choke-iii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/1/1f/Shotgun_Choke_III_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

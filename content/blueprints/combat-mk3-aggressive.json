@@ -3,6 +3,8 @@
   "name": "Combat MK.3 (Aggressive)",
   "slug": "combat-mk3-aggressive",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/4/49/Combat_MK3_Blueprint.png",
-  "owned": false,
+  "type": "Augments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

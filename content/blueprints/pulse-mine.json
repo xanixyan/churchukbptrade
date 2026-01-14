@@ -3,6 +3,8 @@
   "name": "Pulse Mine",
   "slug": "pulse-mine",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/6/64/Pulse_Mine_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 3,
   "notes": ""
 }

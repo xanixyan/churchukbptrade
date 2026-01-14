@@ -3,6 +3,8 @@
   "name": "Equalizer",
   "slug": "equalizer",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/f/f2/Equalizer_Blueprint.png",
+  "type": "Guns",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

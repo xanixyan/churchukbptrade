@@ -3,6 +3,8 @@
   "name": "Tempest",
   "slug": "tempest",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/7/7f/Tempest_Blueprint.png",
+  "type": "Guns",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

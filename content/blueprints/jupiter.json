@@ -3,6 +3,8 @@
   "name": "Jupiter",
   "slug": "jupiter",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/b/bd/Jupiter_Blueprint.png",
+  "type": "Guns",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

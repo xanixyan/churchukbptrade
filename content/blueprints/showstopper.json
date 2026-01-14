@@ -3,6 +3,8 @@
   "name": "Showstopper",
   "slug": "showstopper",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/5/59/Showstopper_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 4,
   "notes": ""
 }

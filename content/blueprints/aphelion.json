@@ -3,6 +3,8 @@
   "name": "Aphelion",
   "slug": "aphelion",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/4/4d/Aphelion_Blueprint.png",
-  "owned": false,
+  "type": "Guns",
+  "owned": true,
+  "ownedQty": 2,
   "notes": ""
 }

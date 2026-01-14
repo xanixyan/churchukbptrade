@@ -3,6 +3,8 @@
   "name": "Wolfpack",
   "slug": "wolfpack",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/0/05/Wolfpack_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 7,
   "notes": ""
 }

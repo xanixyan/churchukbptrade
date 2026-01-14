@@ -3,6 +3,8 @@
   "name": "Compensator II",
   "slug": "compensator-ii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/2/23/Compensator_II_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 4,
   "notes": ""
 }

@@ -3,6 +3,8 @@
   "name": "Gas Mine",
   "slug": "gas-mine",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/f/fd/Gas_Mine_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

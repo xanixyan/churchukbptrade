@@ -3,6 +3,8 @@
   "name": "Jolt Mine",
   "slug": "jolt-mine",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/f/f7/Jolt_Mine_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 2,
   "notes": ""
 }

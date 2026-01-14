@@ -3,6 +3,8 @@
   "name": "Bobcat",
   "slug": "bobcat",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/9/9e/Bobcat_Blueprint.png",
-  "owned": false,
+  "type": "Guns",
+  "owned": true,
+  "ownedQty": 6,
   "notes": ""
 }

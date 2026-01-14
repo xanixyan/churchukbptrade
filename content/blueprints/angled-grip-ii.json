@@ -3,6 +3,8 @@
   "name": "Angled Grip II",
   "slug": "angled-grip-ii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/4/44/Angled_Grip_II_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

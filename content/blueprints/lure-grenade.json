@@ -3,6 +3,8 @@
   "name": "Lure Grenade",
   "slug": "lure-grenade",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/f/f3/Lure_Grenade_Blueprint.png",
+  "type": "Grenades",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

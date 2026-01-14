@@ -3,6 +3,8 @@
   "name": "Blue Light Stick",
   "slug": "blue-light-stick",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/d/d4/Blue_Light_Stick_Blueprint.png",
+  "type": "Utility",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

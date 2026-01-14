@@ -3,6 +3,8 @@
   "name": "Extended Shotgun Magazine II",
   "slug": "extended-shotgun-magazine-ii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/4/4f/Extended_Medium_Shotgun_Mag_II_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

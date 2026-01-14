@@ -3,6 +3,8 @@
   "name": "Remote Raider Flare",
   "slug": "remote-raider-flare",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/f/f8/Remote_Raider_Flare_Blueprint.png",
-  "owned": false,
+  "type": "Utility",
+  "owned": true,
+  "ownedQty": 2,
   "notes": ""
 }

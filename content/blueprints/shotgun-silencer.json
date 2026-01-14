@@ -3,6 +3,8 @@
   "name": "Shotgun Silencer",
   "slug": "shotgun-silencer",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/8/8d/Shotgun_Silencer_Blueprint.png",
+  "type": "Attachments",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

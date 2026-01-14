@@ -3,6 +3,8 @@
   "name": "Silencer I",
   "slug": "silencer-i",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/0/09/Silencer_I_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

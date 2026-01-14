@@ -3,6 +3,8 @@
   "name": "Combat Mk. 3 (Flanking)",
   "slug": "combat-mk-3-flanking",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/9/9e/Combat_MK3_Flanking_Blueprint.png",
+  "type": "Augments",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

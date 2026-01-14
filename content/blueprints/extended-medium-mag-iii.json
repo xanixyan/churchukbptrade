@@ -3,6 +3,8 @@
   "name": "Extended Medium Mag III",
   "slug": "extended-medium-mag-iii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/6/65/Extended_Medium_Mag_III_Blueprint.png",
+  "type": "Attachments",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

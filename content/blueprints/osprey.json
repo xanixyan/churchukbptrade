@@ -3,6 +3,8 @@
   "name": "Osprey",
   "slug": "osprey",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/2/21/Ospris_BP.png",
+  "type": "Guns",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

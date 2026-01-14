@@ -3,6 +3,8 @@
   "name": "Medium Gun Parts",
   "slug": "medium-gun-parts",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/e/e8/Medium_Gun_Parts_Blueprint.png",
-  "owned": false,
+  "type": "Utility",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

@@ -3,6 +3,8 @@
   "name": "Deadline",
   "slug": "deadline",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/8/88/Deadline_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 9,
   "notes": ""
 }

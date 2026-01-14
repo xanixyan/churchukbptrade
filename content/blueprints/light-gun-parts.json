@@ -3,6 +3,8 @@
   "name": "Light Gun Parts",
   "slug": "light-gun-parts",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/b/b4/Light_Gun_Parts_Blueprint.png",
+  "type": "Utility",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

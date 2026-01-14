@@ -3,6 +3,8 @@
   "name": "Green Light Stick",
   "slug": "green-light-stick",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/1/18/Green_Light_Stick_Blueprint.png",
+  "type": "Utility",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

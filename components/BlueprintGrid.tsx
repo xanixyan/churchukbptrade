@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Blueprint, BlueprintSelection } from "@/lib/types";
+import { Blueprint, BlueprintSelection, BlueprintType } from "@/lib/types";
 import { getTotalItemCount } from "@/lib/message-builder";
 import BlueprintCard from "./BlueprintCard";
 import CatalogControls from "./CatalogControls";
 import SelectionBar from "./SelectionBar";
-import BuyModal from "./BuyModal";
+import CheckoutModal from "./CheckoutModal";
 
 interface BlueprintGridProps {
   blueprints: Blueprint[];
@@ -15,6 +15,7 @@ interface BlueprintGridProps {
 export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
   const [search, setSearch] = useState("");
   const [showOwnedOnly, setShowOwnedOnly] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<BlueprintType | null>(null);
 
   // Multi-select state with quantities
   const [selectMode, setSelectMode] = useState(false);
@@ -23,6 +24,11 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
 
   const filteredBlueprints = useMemo(() => {
     let result = blueprints;
+
+    // Filter by category
+    if (categoryFilter) {
+      result = result.filter((bp) => bp.type === categoryFilter);
+    }
 
     // Filter by owned status
     if (showOwnedOnly) {
@@ -40,7 +46,7 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
     }
 
     return result;
-  }, [blueprints, search, showOwnedOnly]);
+  }, [blueprints, search, showOwnedOnly, categoryFilter]);
 
   // Toggle blueprint selection
   const handleToggleSelect = useCallback((blueprint: Blueprint) => {
@@ -113,6 +119,13 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
     setIsModalOpen(false);
   }, []);
 
+  // Handle successful order
+  const handleOrderSuccess = useCallback(() => {
+    setIsModalOpen(false);
+    setSelections([]);
+    setSelectMode(false);
+  }, []);
+
   // Calculate totals
   const totalTypes = selections.length;
   const totalItems = useMemo(() => getTotalItemCount(selections), [selections]);
@@ -124,6 +137,8 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
         onSearchChange={setSearch}
         showOwnedOnly={showOwnedOnly}
         onShowOwnedOnlyChange={setShowOwnedOnly}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
         totalCount={blueprints.length}
         shownCount={filteredBlueprints.length}
         // Select mode props
@@ -148,14 +163,24 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
             />
           </svg>
           <p>Креслень не знайдено</p>
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="mt-2 text-neon-cyan hover:underline"
-            >
-              Очистити пошук
-            </button>
-          )}
+          <div className="flex flex-wrap justify-center gap-2 mt-2">
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-neon-cyan hover:underline"
+              >
+                Очистити пошук
+              </button>
+            )}
+            {categoryFilter && (
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className="text-neon-cyan hover:underline"
+              >
+                Скинути категорію
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -183,11 +208,12 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
         />
       )}
 
-      {/* Buy modal for selected blueprints */}
-      <BuyModal
+      {/* Checkout modal for selected blueprints */}
+      <CheckoutModal
         selections={selections}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
+        onSuccess={handleOrderSuccess}
       />
     </div>
   );

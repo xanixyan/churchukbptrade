@@ -3,6 +3,8 @@
   "name": "Bettina",
   "slug": "bettina",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/8/8a/Bettina_Blueprint.png",
-  "owned": false,
+  "type": "Guns",
+  "owned": true,
+  "ownedQty": 4,
   "notes": ""
 }

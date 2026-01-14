@@ -1,10 +1,15 @@
 "use client";
 
+import { BlueprintType } from "@/lib/types";
+import CategoryFilter from "./CategoryFilter";
+
 interface CatalogControlsProps {
   search: string;
   onSearchChange: (value: string) => void;
   showOwnedOnly: boolean;
   onShowOwnedOnlyChange: (value: boolean) => void;
+  categoryFilter: BlueprintType | null;
+  onCategoryFilterChange: (category: BlueprintType | null) => void;
   totalCount: number;
   shownCount: number;
   // Select mode props
@@ -18,6 +23,8 @@ export default function CatalogControls({
   onSearchChange,
   showOwnedOnly,
   onShowOwnedOnlyChange,
+  categoryFilter,
+  onCategoryFilterChange,
   totalCount,
   shownCount,
   selectMode = false,
@@ -97,6 +104,11 @@ export default function CatalogControls({
             <span className="text-sm text-gray-300">Тільки креслення в наявності</span>
           </label>
         </div>
+      </div>
+
+      {/* Category filter */}
+      <div className="mt-4">
+        <CategoryFilter selected={categoryFilter} onChange={onCategoryFilterChange} />
       </div>
 
       {/* Count */}

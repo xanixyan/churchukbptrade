@@ -3,6 +3,8 @@
   "name": "Trigger Nade",
   "slug": "trigger-nade",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/b/b6/Trigger_Nade_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 5,
   "notes": ""
 }

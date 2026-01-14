@@ -3,6 +3,8 @@
   "name": "Barricade Kit",
   "slug": "barricade-kit",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/6/67/Barrcade_Kit_Blueprint.png",
+  "type": "Utility",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

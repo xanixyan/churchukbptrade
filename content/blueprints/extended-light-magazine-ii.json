@@ -3,6 +3,8 @@
   "name": "Extended Light Magazine II",
   "slug": "extended-light-magazine-ii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/9/91/Extended_Light_Mag_II_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

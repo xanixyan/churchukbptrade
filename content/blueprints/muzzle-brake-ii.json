@@ -3,6 +3,8 @@
   "name": "Muzzle Brake II",
   "slug": "muzzle-brake-ii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/0/0e/Muzzle_Brake_II_Blueprint.png",
+  "type": "Attachments",
   "owned": false,
+  "ownedQty": 0,
   "notes": ""
 }

@@ -3,6 +3,8 @@
   "name": "Defibrillator",
   "slug": "defibrillator",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/6/6a/Defibrillator_Blueprint.png",
-  "owned": false,
+  "type": "Heals",
+  "owned": true,
+  "ownedQty": 5,
   "notes": ""
 }

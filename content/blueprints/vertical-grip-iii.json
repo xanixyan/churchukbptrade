@@ -3,6 +3,8 @@
   "name": "Vertical Grip III",
   "slug": "vertical-grip-iii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/c/cc/Vertrical_Grip_III_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 3,
   "notes": ""
 }

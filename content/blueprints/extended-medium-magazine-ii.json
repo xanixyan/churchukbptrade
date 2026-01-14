@@ -3,6 +3,8 @@
   "name": "Extended Medium Magazine II",
   "slug": "extended-medium-magazine-ii",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/0/07/Extended_Medium_Mag_II_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

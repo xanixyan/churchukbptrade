@@ -3,6 +3,8 @@
   "name": "IL Toro",
   "slug": "il-toro",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/a/a7/IL_Toro_Blueprint.png",
-  "owned": false,
+  "type": "Guns",
+  "owned": true,
+  "ownedQty": 3,
   "notes": ""
 }

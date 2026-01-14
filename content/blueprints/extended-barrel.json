@@ -3,6 +3,8 @@
   "name": "Extended Barrel",
   "slug": "extended-barrel",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/0/0d/Extended_Barrel_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

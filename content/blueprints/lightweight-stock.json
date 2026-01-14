@@ -3,6 +3,8 @@
   "name": "Lightweight Stock",
   "slug": "lightweight-stock",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/c/c8/Lightweight_Stock_Blueprint.png",
-  "owned": false,
+  "type": "Attachments",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }

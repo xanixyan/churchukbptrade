@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Blueprint, BlueprintSelection } from "@/lib/types";
-import BuyModal from "./BuyModal";
+import { Blueprint, BlueprintSelection, getMaxSelectableQty } from "@/lib/types";
+import CheckoutModal from "./CheckoutModal";
 import QuantitySelector from "./QuantitySelector";
 
 interface BlueprintDetailProps {
@@ -14,11 +14,20 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  // Create selection for BuyModal
+  const maxQty = getMaxSelectableQty(blueprint);
+  const canBuy = maxQty > 0;
+
+  // Create selection for CheckoutModal
   const selection: BlueprintSelection[] = useMemo(
     () => [{ blueprint, quantity }],
     [blueprint, quantity]
   );
+
+  // Handle successful order
+  const handleOrderSuccess = () => {
+    setIsModalOpen(false);
+    setQuantity(1);
+  };
 
   return (
     <>
@@ -56,12 +65,14 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
                 </div>
               )}
 
-              {/* Owned badge */}
-              {blueprint.owned && (
-                <div className="absolute top-4 right-4 px-3 py-1.5 bg-neon-cyan/20 text-neon-cyan text-sm font-bold rounded border border-neon-cyan/40">
-                  Є В НАЯВНОСТІ
-                </div>
-              )}
+              {/* Owned badge with quantity */}
+              <div className={"absolute top-4 right-4 px-3 py-1.5 text-sm font-bold rounded border " + (
+                blueprint.ownedQty > 0
+                  ? "bg-neon-cyan/20 text-neon-cyan border-neon-cyan/40"
+                  : "bg-gray-800/80 text-gray-500 border-gray-600"
+              )}>
+                {blueprint.ownedQty > 0 ? "×" + blueprint.ownedQty : "Немає"}
+              </div>
             </div>
 
             {/* Info */}
@@ -72,13 +83,13 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
               {/* Status */}
               <div className="flex items-center gap-2 mb-6">
                 <span
-                  className={`px-3 py-1 text-sm rounded-full ${
-                    blueprint.owned
+                  className={"px-3 py-1 text-sm rounded-full " + (
+                    blueprint.ownedQty > 0
                       ? "bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40"
                       : "bg-gray-700 text-gray-400 border border-gray-600"
-                  }`}
+                  )}
                 >
-                  {blueprint.owned ? "В наявності" : "Немає в наявності"}
+                  {blueprint.ownedQty > 0 ? "В наявності ×" + blueprint.ownedQty : "Немає в наявності"}
                 </span>
               </div>
 
@@ -91,7 +102,7 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
               )}
 
               {/* Quantity selector (only for owned blueprints) */}
-              {blueprint.owned && (
+              {canBuy && (
                 <div className="mb-4 p-4 bg-dark-700 rounded-lg border border-dark-600">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-300">Кількість:</span>
@@ -99,18 +110,22 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
                       quantity={quantity}
                       onChange={setQuantity}
                       size="md"
+                      max={maxQty}
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-2 text-right">
+                    Доступно: {maxQty}
+                  </p>
                 </div>
               )}
 
               {/* Buy button */}
-              {blueprint.owned ? (
+              {canBuy ? (
                 <button
                   onClick={() => setIsModalOpen(true)}
                   className="w-full neon-btn py-3 px-6 rounded-lg font-bold text-black"
                 >
-                  Купити {quantity > 1 ? `(×${quantity})` : ""} — Скопіювати повідомлення
+                  Купити {quantity > 1 ? "(×" + quantity + ")" : ""}
                 </button>
               ) : (
                 <button
@@ -122,7 +137,7 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
               )}
 
               <p className="mt-4 text-xs text-gray-500 text-center">
-                Без прямої оплати. Скопіюй повідомлення та напиши мені в Discord.
+                Після оформлення я отримаю повідомлення та напишу вам в Discord
               </p>
             </div>
           </div>
@@ -130,10 +145,11 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
       </div>
 
       {/* Updated: pass selection with quantity */}
-      <BuyModal
+      <CheckoutModal
         selections={selection}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={handleOrderSuccess}
       />
     </>
   );

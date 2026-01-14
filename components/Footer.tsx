@@ -6,16 +6,15 @@ export default function Footer() {
           <div className="flex flex-col gap-1">
             <p className="text-white font-medium">Як купити:</p>
             <p>
-              1. Натисни <span className="text-neon-cyan">Купити</span> на будь-якому кресленні
+              1. Обери креслення та натисни <span className="text-neon-cyan">Купити обране</span>
             </p>
-            <p>2. Скопіюй повідомлення</p>
+            <p>2. Введи свій Discord нік та що пропонуєш</p>
             <p>
-              3. Напиши мені в Discord: <span className="text-white font-medium">churchuk</span>
+              3. Я напишу тобі в Discord: <a href="https://discord.gg/8QHke5UX" target="_blank" rel="noopener noreferrer" className="text-white font-medium hover:text-neon-cyan transition-colors">churchuk</a>
             </p>
           </div>
           <div className="text-xs text-gray-500">
-            <p>/admin тільки для власника</p>
-            <p className="mt-1">© {new Date().getFullYear()} churchukbptrade</p>
+            <p>© {new Date().getFullYear()} churchukbptrade</p>
           </div>
         </div>
       </div>

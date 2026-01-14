@@ -3,6 +3,8 @@
   "name": "Blaze Grenade",
   "slug": "blaze-grenade",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/3/3b/Blaze_Grenade_Blueprint.png",
-  "owned": false,
+  "type": "Grenades",
+  "owned": true,
+  "ownedQty": 3,
   "notes": ""
 }

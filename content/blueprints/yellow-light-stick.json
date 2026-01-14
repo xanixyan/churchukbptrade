@@ -3,6 +3,8 @@
   "name": "Yellow Light Stick",
   "slug": "yellow-light-stick",
   "image": "https://static.wikia.nocookie.net/arc-raiders/images/d/d0/Yellow_Light_Stick_Blueprint.png",
-  "owned": false,
+  "type": "Utility",
+  "owned": true,
+  "ownedQty": 1,
   "notes": ""
 }
