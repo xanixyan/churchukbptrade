@@ -1,0 +1,11 @@
+{
+  "id": "BP-080",
+  "name": "Wolfpack",
+  "slug": "wolfpack",
+  "image": "/blueprints/wolfpack.png",
+  "type": "Grenades",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.647Z"
+}

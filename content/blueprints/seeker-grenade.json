@@ -1,0 +1,11 @@
+{
+  "id": "BP-054",
+  "name": "Seeker Grenade",
+  "slug": "seeker-grenade",
+  "image": "/blueprints/seeker-grenade.png",
+  "type": "Grenades",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.620Z"
+}

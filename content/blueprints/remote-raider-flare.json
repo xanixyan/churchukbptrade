@@ -1,0 +1,11 @@
+{
+  "id": "BP-053",
+  "name": "Remote Raider Flare",
+  "slug": "remote-raider-flare",
+  "image": "/blueprints/remote-raider-flare.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.619Z"
+}

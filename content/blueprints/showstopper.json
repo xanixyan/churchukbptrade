@@ -1,0 +1,11 @@
+{
+  "id": "BP-058",
+  "name": "Showstopper",
+  "slug": "showstopper",
+  "image": "/blueprints/showstopper.png",
+  "type": "Grenades",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.626Z"
+}

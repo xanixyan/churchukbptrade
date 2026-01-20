@@ -1,0 +1,11 @@
+{
+  "id": "BP-043",
+  "name": "Looting MK.3 (Survivor)",
+  "slug": "looting-mk3-survivor",
+  "image": "/blueprints/looting-mk3-survivor.png",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.607Z"
+}

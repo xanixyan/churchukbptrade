@@ -1,0 +1,11 @@
+{
+  "id": "BP-018",
+  "name": "Defibrillator",
+  "slug": "defibrillator",
+  "image": "/blueprints/defibrillator.png",
+  "type": "Heals",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.588Z"
+}

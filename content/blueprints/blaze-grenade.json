@@ -1,0 +1,11 @@
+{
+  "id": "BP-008",
+  "name": "Blaze Grenade",
+  "slug": "blaze-grenade",
+  "image": "/blueprints/blaze-grenade.png",
+  "type": "Grenades",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.578Z"
+}

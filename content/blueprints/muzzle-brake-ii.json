@@ -1,0 +1,11 @@
+{
+  "id": "BP-046",
+  "name": "Muzzle Brake II",
+  "slug": "muzzle-brake-ii",
+  "image": "/blueprints/muzzle-brake-ii.png",
+  "type": "Attachments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.612Z"
+}

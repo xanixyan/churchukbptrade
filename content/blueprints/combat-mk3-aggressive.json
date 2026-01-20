@@ -1,0 +1,11 @@
+{
+  "id": "BP-013",
+  "name": "Combat MK.3 (Aggressive)",
+  "slug": "combat-mk3-aggressive",
+  "image": "/blueprints/combat-mk3-aggressive.png",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.582Z"
+}

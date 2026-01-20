@@ -1,0 +1,11 @@
+{
+  "id": "BP-063",
+  "name": "Snap Hook",
+  "slug": "snap-hook",
+  "image": "/blueprints/snap-hook.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.630Z"
+}

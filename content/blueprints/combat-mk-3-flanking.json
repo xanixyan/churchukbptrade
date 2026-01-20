@@ -1,0 +1,11 @@
+{
+  "id": "BP-012",
+  "name": "Combat Mk. 3 (Flanking)",
+  "slug": "combat-mk-3-flanking",
+  "image": "/blueprints/combat-mk-3-flanking.png",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.583Z"
+}

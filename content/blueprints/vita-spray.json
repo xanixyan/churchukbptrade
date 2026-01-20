@@ -1,0 +1,11 @@
+{
+  "id": "BP-078",
+  "name": "Vita Spray",
+  "slug": "vita-spray",
+  "image": "/blueprints/vita-spray.png",
+  "type": "Heals",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.645Z"
+}

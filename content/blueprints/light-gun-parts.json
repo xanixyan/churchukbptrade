@@ -1,0 +1,11 @@
+{
+  "id": "BP-039",
+  "name": "Light Gun Parts",
+  "slug": "light-gun-parts",
+  "image": "/blueprints/light-gun-parts.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.603Z"
+}

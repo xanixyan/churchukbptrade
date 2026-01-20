@@ -1,0 +1,11 @@
+{
+  "id": "BP-052",
+  "name": "Red Light Stick",
+  "slug": "red-light-stick",
+  "image": "/blueprints/red-light-stick.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.618Z"
+}

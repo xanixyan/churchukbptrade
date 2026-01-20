@@ -1,0 +1,11 @@
+{
+  "id": "BP-030",
+  "name": "Green Light Stick",
+  "slug": "green-light-stick",
+  "image": "/blueprints/green-light-stick.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.598Z"
+}

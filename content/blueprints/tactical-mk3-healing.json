@@ -1,0 +1,11 @@
+{
+  "id": "BP-067",
+  "name": "Tactical MK.3 (Healing)",
+  "slug": "tactical-mk3-healing",
+  "image": "/blueprints/tactical-mk3-healing.png",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.634Z"
+}

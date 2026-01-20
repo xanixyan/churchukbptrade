@@ -1,0 +1,11 @@
+{
+  "id": "BP-040",
+  "name": "Lightweight Stock",
+  "slug": "lightweight-stock",
+  "image": "/blueprints/lightweight-stock.png",
+  "type": "Attachments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.606Z"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "BP-020",
+  "name": "Explosive Mine",
+  "slug": "explosive-mine",
+  "image": "/blueprints/explosive-mine.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.592Z"
+}

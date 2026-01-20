@@ -1,0 +1,11 @@
+{
+  "id": "BP-028",
+  "name": "Fireworks Box",
+  "slug": "fireworks-box",
+  "image": "/blueprints/fireworks-box.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.596Z"
+}

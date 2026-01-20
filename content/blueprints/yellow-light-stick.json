@@ -1,0 +1,11 @@
+{
+  "id": "BP-081",
+  "name": "Yellow Light Stick",
+  "slug": "yellow-light-stick",
+  "image": "/blueprints/yellow-light-stick.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.648Z"
+}

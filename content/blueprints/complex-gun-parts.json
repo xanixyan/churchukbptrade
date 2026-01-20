@@ -1,0 +1,11 @@
+{
+  "id": "BP-016",
+  "name": "Complex Gun Parts",
+  "slug": "complex-gun-parts",
+  "image": "/blueprints/complex-gun-parts.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.587Z"
+}

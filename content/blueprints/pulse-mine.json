@@ -1,0 +1,11 @@
+{
+  "id": "BP-050",
+  "name": "Pulse Mine",
+  "slug": "pulse-mine",
+  "image": "/blueprints/pulse-mine.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.617Z"
+}

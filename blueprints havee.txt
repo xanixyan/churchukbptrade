@@ -1,0 +1,73 @@
+Anvil Blueprint 2
+Angled Grip II Blueprint 1
+Angled Grip III Blueprint 0
+Aphelion Blueprint 2
+Barricade Kit Blueprint 0
+Bettina Blueprint 4
+Blaze Grenade Blueprint 3
+Blue Light Stick Blueprint 0
+Bobcat Blueprint 6
+Burletta Blueprint 0
+Combat MK3 Blueprint 1
+Combat MK3 Flanking Blueprint 0
+Compensator II Blueprint 4
+Compensator III Blueprint 1
+Complex Gun Parts Blueprint 0
+Deadline Blueprint 9
+Defibrillator Blueprint 5
+Explosive Mine Blueprint 4
+Extended Barrel Blueprint 1
+Extended Light Mag II Blueprint 1
+Extended Light Mag III Blueprint 1
+Extended Medium Mag II Blueprint 1
+Extended Medium Mag III Blueprint 0
+Extended Shotgun Mag II Blueprint 1
+Extended Shotgun Mag III Blueprint 0
+Equalizer Blueprint 0
+Fireworks Box Blueprint 0
+Gas Mine Blueprint 1
+Green Light Stick Blueprint 0
+Heavy Gun Parts Blueprint 0
+Hullcracker Blueprint 0
+IL Toro Blueprint 3 
+Jolt Mine Blueprint 2
+Jupiter Blueprint 0
+Lightweight Stock Blueprint 1
+Light Gun Parts Blueprint 0
+Looting MK3 Survivor (Cautious) Blueprint 0
+Looting MK3 Survivor (Survivor) Blueprint 0
+Lure Grenade Blueprint 0
+Medium Gun Parts Blueprint 1
+Muzzle Brake II Blueprint 0
+Muzzle Brake III Blueprint 0
+Osprey Blueprint 0
+Padded Stock Blueprint 1
+Pulse Mine Blueprint 3
+Red Light Stick Blueprint 2
+Remote Raider Flare Blueprint 2
+Seeker Grenade Blueprint 4
+Shotgun Choke II Blueprint 0
+Shotgun Choke III Blueprint 1
+Shotgun Silencer Blueprint 0
+Showstopper Blueprint 4
+Silencer I Blueprint 1
+Silencer II Blueprint 1
+Smoke Grenade Blueprint 1
+Snap Hook Blueprint 1
+Stable Stock II Blueprint 3
+Stable Stock III Blueprint 0
+Tactical MK3 Defensive Blueprint 1
+Tactical MK3 Healing Blueprint 1
+Tagging Grenade Blueprint 0
+Tempest Blueprint 0
+Torrente Blueprint 2
+Trailblazer Grenade Blueprint 3
+Trigger Nade Blueprint 5
+Venator Blueprint 3
+Vertical Grip II Blueprint 0
+Vertical Grip III Blueprint 3
+Vita Shot Blueprint 0
+Vita Spray Blueprint 0
+Vulcano Blueprint 2
+Wolfpack Blueprint 7
+Yellow Light Stick Blueprint 1 

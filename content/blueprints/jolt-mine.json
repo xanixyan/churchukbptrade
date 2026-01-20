@@ -1,0 +1,11 @@
+{
+  "id": "BP-036",
+  "name": "Jolt Mine",
+  "slug": "jolt-mine",
+  "image": "/blueprints/jolt-mine.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.601Z"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "BP-059",
+  "name": "Silencer I",
+  "slug": "silencer-i",
+  "image": "/blueprints/silencer-i.png",
+  "type": "Attachments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.627Z"
+}

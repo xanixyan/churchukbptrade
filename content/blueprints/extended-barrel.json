@@ -1,0 +1,11 @@
+{
+  "id": "BP-021",
+  "name": "Extended Barrel",
+  "slug": "extended-barrel",
+  "image": "/blueprints/extended-barrel.png",
+  "type": "Attachments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.595Z"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "BP-011",
+  "name": "Burletta",
+  "slug": "burletta",
+  "image": "/blueprints/burletta.png",
+  "type": "Guns",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.581Z"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "BP-003",
+  "name": "Anvil",
+  "slug": "anvil",
+  "image": "/blueprints/anvil.png",
+  "type": "Guns",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.572Z"
+}

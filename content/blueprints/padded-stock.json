@@ -1,0 +1,11 @@
+{
+  "id": "BP-049",
+  "name": "Padded Stock",
+  "slug": "padded-stock",
+  "image": "/blueprints/padded-stock.png",
+  "type": "Attachments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.616Z"
+}

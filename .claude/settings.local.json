@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(cmd /c \"npm install\")",
+      "Bash(cmd /c \"npm --version\")",
+      "Bash(powershell -Command \"npm --version\")",
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(node -e:*)",
+      "Bash(node scripts/add-types.mjs:*)",
+      "Bash(npx next build)",
+      "Bash(npm install:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose:*)",
+      "Bash(timeout:*)",
+      "Bash(findstr:*)",
+      "Bash(ping:*)",
+      "Bash(powershell:*)",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(xargs:*)",
+      "Bash(node scripts/update-blueprint-images.js:*)",
+      "Bash(npx tsc:*)",
+      "Bash(copy \"temp_icon\\\\small_icon.png\" \"public\\\\favicon.png\")",
+      "Bash(New-Item -ItemType Directory -Path \"F:\\\\sellingplace miltiacc\\\\app\\\\api\\\\admin\\\\orders\" -Force)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

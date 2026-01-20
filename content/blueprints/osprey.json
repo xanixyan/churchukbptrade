@@ -1,0 +1,11 @@
+{
+  "id": "BP-048",
+  "name": "Osprey",
+  "slug": "osprey",
+  "image": "/blueprints/osprey.png",
+  "type": "Guns",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.615Z"
+}

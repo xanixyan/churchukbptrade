@@ -1,0 +1,11 @@
+{
+  "id": "BP-070",
+  "name": "Tempest",
+  "slug": "tempest",
+  "image": "/blueprints/tempest.png",
+  "type": "Guns",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.636Z"
+}

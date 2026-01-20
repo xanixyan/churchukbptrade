@@ -1,0 +1,11 @@
+{
+  "id": "BP-044",
+  "name": "Lure Grenade",
+  "slug": "lure-grenade",
+  "image": "/blueprints/lure-grenade.png",
+  "type": "Grenades",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.608Z"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "BP-073",
+  "name": "Trigger Nade",
+  "slug": "trigger-nade",
+  "image": "/blueprints/trigger-nade.png",
+  "type": "Grenades",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.639Z"
+}

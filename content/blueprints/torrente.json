@@ -1,0 +1,11 @@
+{
+  "id": "BP-071",
+  "name": "Torrente",
+  "slug": "torrente",
+  "image": "/blueprints/torrente.png",
+  "type": "Guns",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.637Z"
+}

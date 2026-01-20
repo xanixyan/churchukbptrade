@@ -1,0 +1,11 @@
+{
+  "id": "BP-047",
+  "name": "Muzzle Brake III",
+  "slug": "muzzle-brake-iii",
+  "image": "/blueprints/muzzle-brake-iii.png",
+  "type": "Attachments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.614Z"
+}

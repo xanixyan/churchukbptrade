@@ -1,0 +1,11 @@
+{
+  "id": "BP-066",
+  "name": "Tactical MK.3 (Defensive)",
+  "slug": "tactical-mk3-defensive",
+  "image": "/blueprints/tactical-mk3-defensive.png",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.633Z"
+}

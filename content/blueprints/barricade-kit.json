@@ -1,0 +1,11 @@
+{
+  "id": "BP-006",
+  "name": "Barricade Kit",
+  "slug": "barricade-kit",
+  "image": "/blueprints/barricade-kit.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.575Z"
+}

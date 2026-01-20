@@ -1,0 +1,11 @@
+{
+  "id": "BP-029",
+  "name": "Gas Mine",
+  "slug": "gas-mine",
+  "image": "/blueprints/gas-mine.png",
+  "type": "Utility",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-19T08:52:04.597Z"
+}

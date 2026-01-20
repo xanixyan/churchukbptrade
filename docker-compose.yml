@@ -1,0 +1,45 @@
+# Docker Compose for churchukbptrade
+#
+# Production:  docker-compose up -d
+# Development: docker-compose -f docker-compose.dev.yml up
+#
+# Data persistence:
+# - ./content/blueprints: Blueprint catalog data
+# - ./data: Seller accounts and inventory data
+#
+# Cookie/Session Configuration (for external access):
+# - COOKIE_SECURE=false  : Required if accessing via HTTP (no HTTPS)
+# - COOKIE_SAMESITE=lax  : Default, allows external access
+# - COOKIE_DOMAIN        : Optional, for subdomain cookies
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:3000"
+    environment:
+      - NODE_ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ADMIN_CHAT_ID=${TELEGRAM_ADMIN_CHAT_ID}
+      - TELEGRAM_GROUP_CHAT_ID=${TELEGRAM_GROUP_CHAT_ID}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # Cookie settings for external access (HTTP port forwarding)
+      # Set COOKIE_SECURE=false if NOT using HTTPS
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
+    env_file:
+      - .env.local
+    volumes:
+      # Blueprint catalog data (content/*.json files)
+      - ./content/blueprints:/app/content/blueprints
+      # Seller accounts and inventory data (IMPORTANT for multi-seller system)
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
