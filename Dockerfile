@@ -70,8 +70,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Copy bcrypt native module (standalone doesn't include native bindings correctly)
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/bcrypt ./node_modules/bcrypt
 
-# Create data directory for any additional runtime data
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+# Create data directories for runtime data with proper permissions
+RUN mkdir -p /app/data/sellers /app/data/orders && \
+    chown -R nextjs:nodejs /app/data
 
 # Switch to non-root user
 USER nextjs
