@@ -6,12 +6,15 @@ import QuantitySelector from "./QuantitySelector";
 
 interface BlueprintCardProps {
   blueprint: Blueprint;
-  // Select mode props
+  // Select mode props (legacy)
   selectMode?: boolean;
   isSelected?: boolean;
   quantity?: number;
   onToggleSelect?: (blueprint: Blueprint) => void;
   onQuantityChange?: (blueprint: Blueprint, quantity: number) => void;
+  // Cart mode props
+  isCartMode?: boolean;
+  onAddToCart?: (blueprint: Blueprint) => void;
 }
 
 export default function BlueprintCard({
@@ -21,9 +24,12 @@ export default function BlueprintCard({
   quantity = 1,
   onToggleSelect,
   onQuantityChange,
+  isCartMode = false,
+  onAddToCart,
 }: BlueprintCardProps) {
   const maxQty = getMaxSelectableQty(blueprint);
   const canSelect = maxQty > 0;
+  const hasStock = (blueprint.ownedQty || 0) > 0;
 
   // Handle click in select mode
   const handleClick = (e: React.MouseEvent) => {
@@ -126,6 +132,27 @@ export default function BlueprintCard({
             <p className="text-xs text-gray-500 mt-1 text-right">
               Доступно: {maxQty}
             </p>
+          </div>
+        )}
+
+        {/* Add to cart button in cart mode */}
+        {isCartMode && hasStock && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAddToCart?.(blueprint);
+            }}
+            className="mt-2 w-full px-3 py-1.5 bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40 rounded text-xs font-medium hover:bg-neon-cyan/30 transition-colors"
+          >
+            Обрати
+          </button>
+        )}
+
+        {/* Out of stock message in cart mode */}
+        {isCartMode && !hasStock && (
+          <div className="mt-2 text-center text-xs text-gray-500">
+            Немає в наявності
           </div>
         )}
       </div>

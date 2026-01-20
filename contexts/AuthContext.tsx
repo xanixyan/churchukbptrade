@@ -2,23 +2,34 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
+type UserRole = "buyer" | "seller" | "admin";
 type SellerStatus = "active" | "pending_verification" | "banned" | "disabled";
 
-interface SellerInfo {
+interface UserInfo {
   id: string;
   discordId: string;
-  status: SellerStatus;
+  status?: SellerStatus; // Only for sellers
 }
 
 interface AuthState {
   isAuthenticated: boolean;
-  seller: SellerInfo | null;
+  role: UserRole | null;
+  roles: UserRole[]; // All roles the user has
+  user: UserInfo | null;
+  sellerId: string | null; // Seller profile ID (if user has seller role)
+  buyerId: string | null; // Buyer profile ID (if user has buyer role)
+  sellerPending: boolean; // True if seller account is pending verification
   isLoading: boolean;
 }
 
 interface AuthContextType extends AuthState {
   refreshAuth: () => Promise<void>;
-  setAuthState: (authenticated: boolean, seller: SellerInfo | null) => void;
+  setAuthState: (authenticated: boolean, role: UserRole | null, user: UserInfo | null, roles?: UserRole[]) => void;
+  logout: () => Promise<void>;
+  switchRole: (newRole: UserRole) => Promise<boolean>;
+  hasRole: (role: UserRole) => boolean;
+  // Legacy compatibility
+  seller: UserInfo | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -26,38 +37,120 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthStateInternal] = useState<AuthState>({
     isAuthenticated: false,
-    seller: null,
+    role: null,
+    roles: [],
+    user: null,
+    sellerId: null,
+    buyerId: null,
+    sellerPending: false,
     isLoading: true,
   });
 
   // Fetch auth state from server
   const refreshAuth = useCallback(async () => {
     try {
-      const response = await fetch("/api/seller/auth", {
+      const response = await fetch("/api/auth", {
         credentials: "include",
       });
       const data = await response.json();
 
       setAuthStateInternal({
         isAuthenticated: data.authenticated || false,
-        seller: data.seller || null,
+        role: data.role || null,
+        roles: data.roles || [],
+        user: data.user || null,
+        sellerId: data.sellerId || null,
+        buyerId: data.buyerId || null,
+        sellerPending: data.sellerPending || false,
         isLoading: false,
       });
     } catch (error) {
       console.error("Auth refresh error:", error);
       setAuthStateInternal({
         isAuthenticated: false,
-        seller: null,
+        role: null,
+        roles: [],
+        user: null,
+        sellerId: null,
+        buyerId: null,
+        sellerPending: false,
         isLoading: false,
       });
     }
   }, []);
 
   // Set auth state directly (for immediate updates after login/logout)
-  const setAuthState = useCallback((authenticated: boolean, seller: SellerInfo | null) => {
-    setAuthStateInternal({
+  const setAuthState = useCallback((
+    authenticated: boolean,
+    role: UserRole | null,
+    user: UserInfo | null,
+    roles?: UserRole[]
+  ) => {
+    setAuthStateInternal(prev => ({
+      ...prev,
       isAuthenticated: authenticated,
-      seller,
+      role,
+      roles: roles || prev.roles,
+      user,
+      isLoading: false,
+    }));
+  }, []);
+
+  // Switch active role
+  const switchRole = useCallback(async (newRole: UserRole): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/auth", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role: newRole }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error("Role switch failed:", data.error);
+        return false;
+      }
+
+      // Update local state with new active role
+      setAuthStateInternal(prev => ({
+        ...prev,
+        role: data.role || newRole,
+        roles: data.roles || prev.roles,
+        user: data.user || prev.user,
+      }));
+
+      return true;
+    } catch (error) {
+      console.error("Role switch error:", error);
+      return false;
+    }
+  }, []);
+
+  // Check if user has a specific role
+  const hasRole = useCallback((role: UserRole): boolean => {
+    return authState.roles.includes(role);
+  }, [authState.roles]);
+
+  // Logout
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/auth", {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+    setAuthStateInternal({
+      isAuthenticated: false,
+      role: null,
+      roles: [],
+      user: null,
+      sellerId: null,
+      buyerId: null,
+      sellerPending: false,
       isLoading: false,
     });
   }, []);
@@ -67,12 +160,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshAuth();
   }, [refreshAuth]);
 
+  // Legacy compatibility: seller is user if role is seller
+  const seller = authState.role === "seller" ? authState.user : null;
+
   return (
     <AuthContext.Provider
       value={{
         ...authState,
         refreshAuth,
         setAuthState,
+        logout,
+        switchRole,
+        hasRole,
+        seller,
       }}
     >
       {children}

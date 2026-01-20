@@ -7,6 +7,9 @@ import BlueprintCard from "./BlueprintCard";
 import CatalogControls from "./CatalogControls";
 import SelectionBar from "./SelectionBar";
 import CheckoutModal from "./CheckoutModal";
+import CartPanel from "./CartPanel";
+import SellerPickerModal from "./SellerPickerModal";
+import { useCart } from "@/contexts/CartContext";
 
 interface BlueprintGridProps {
   blueprints: Blueprint[];
@@ -17,10 +20,16 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
   const [showOwnedOnly, setShowOwnedOnly] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<BlueprintType | null>(null);
 
-  // Multi-select state with quantities
+  // Multi-select state with quantities (legacy mode)
   const [selectMode, setSelectMode] = useState(false);
   const [selections, setSelections] = useState<BlueprintSelection[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Cart integration
+  const { isCartOpen, isMultiSelectMode, enterMultiSelectMode, totalItems: cartTotalItems } = useCart();
+
+  // Seller picker modal state
+  const [sellerPickerBlueprint, setSellerPickerBlueprint] = useState<Blueprint | null>(null);
 
   const filteredBlueprints = useMemo(() => {
     let result = blueprints;
@@ -130,8 +139,18 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
   const totalTypes = selections.length;
   const totalItems = useMemo(() => getTotalItemCount(selections), [selections]);
 
+  // Handle opening seller picker for a blueprint
+  const handleOpenSellerPicker = useCallback((blueprint: Blueprint) => {
+    setSellerPickerBlueprint(blueprint);
+  }, []);
+
+  // Handle closing seller picker
+  const handleCloseSellerPicker = useCallback(() => {
+    setSellerPickerBlueprint(null);
+  }, []);
+
   return (
-    <div className={selectMode && selections.length > 0 ? "pb-20" : ""}>
+    <div className={`${selectMode && selections.length > 0 ? "pb-20" : ""} ${isCartOpen ? "lg:mr-[420px]" : ""} transition-all duration-300`}>
       <CatalogControls
         search={search}
         onSearchChange={setSearch}
@@ -141,10 +160,14 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
         onCategoryFilterChange={setCategoryFilter}
         totalCount={blueprints.length}
         shownCount={filteredBlueprints.length}
-        // Select mode props
+        // Select mode props (legacy)
         selectMode={selectMode}
         onToggleSelectMode={handleToggleSelectMode}
         selectedCount={totalTypes}
+        // Cart mode props
+        cartItemCount={cartTotalItems}
+        onEnterCartMode={enterMultiSelectMode}
+        isCartMode={isMultiSelectMode}
       />
 
       {filteredBlueprints.length === 0 ? (
@@ -193,6 +216,9 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
               quantity={getQuantity(bp)}
               onToggleSelect={handleToggleSelect}
               onQuantityChange={handleQuantityChange}
+              // Cart mode props
+              isCartMode={isMultiSelectMode}
+              onAddToCart={handleOpenSellerPicker}
             />
           ))}
         </div>
@@ -208,13 +234,26 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
         />
       )}
 
-      {/* Checkout modal for selected blueprints */}
+      {/* Checkout modal for selected blueprints (legacy mode) */}
       <CheckoutModal
         selections={selections}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSuccess={handleOrderSuccess}
       />
+
+      {/* Cart panel */}
+      <CartPanel />
+
+      {/* Seller picker modal */}
+      {sellerPickerBlueprint && (
+        <SellerPickerModal
+          blueprint={sellerPickerBlueprint}
+          isOpen={true}
+          onClose={handleCloseSellerPicker}
+          initialQuantity={1}
+        />
+      )}
     </div>
   );
 }

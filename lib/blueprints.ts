@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Blueprint, BlueprintType, isValidBlueprintType } from "./types";
-import { getAggregatedInventory } from "./sellers";
+import { getAggregatedInventory, getSellerCountForBlueprint } from "./sellers";
 
 const BLUEPRINTS_DIR = path.join(process.cwd(), "content", "blueprints");
 
@@ -22,6 +22,8 @@ export interface BlueprintWithInventory extends Blueprint {
   totalQty: number; // Total quantity across all active sellers
   available: boolean; // True if any seller has this blueprint
   sellerCount: number; // Number of sellers that have this blueprint
+  // Note: minPrice removed because prices are now in different units (materials/blueprints)
+  // and cannot be meaningfully compared
 }
 
 /**

@@ -8,8 +8,9 @@ import {
   sendGroupNotification,
   OrderRequest,
 } from "@/lib/order";
-import { saveOrder } from "@/lib/orders";
+import { saveOrder, StoredOrder } from "@/lib/orders";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
+import { validateSession } from "@/lib/auth";
 
 // Rate limit config: 3 requests per 5 minutes per IP
 const RATE_LIMIT_CONFIG = {
@@ -41,6 +42,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if buyer is logged in FIRST to determine validation rules
+    let buyerId: string | undefined;
+    let buyerDiscordId: string | undefined;
+    let isLoggedInBuyer = false;
+    try {
+      const session = await validateSession();
+      if (session.authenticated && session.role === "buyer" && session.buyerId && session.discordId) {
+        buyerId = session.buyerId;
+        buyerDiscordId = session.discordId;
+        isLoggedInBuyer = true;
+      }
+    } catch {
+      // Session check failed, continue as guest
+    }
+
     // Parse request body
     let body: unknown;
     try {
@@ -52,8 +68,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate request
-    const validation = validateOrder(body);
+    // Validate request (skip discord validation for logged-in buyers - we'll use session value)
+    const validation = validateOrder(body, { skipDiscordValidation: isLoggedInBuyer });
     if (!validation.valid) {
       return NextResponse.json(
         {
@@ -79,12 +95,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Process order and resolve to sellers
-    const order = body as OrderRequest;
+    // SECURITY: For logged-in buyers, ALWAYS use session discordId (ignore client-provided value)
+    const rawOrder = body as OrderRequest;
+    const order: OrderRequest = {
+      ...rawOrder,
+      discordNick: isLoggedInBuyer ? buyerDiscordId! : rawOrder.discordNick,
+      // Ensure offer has a default value if not provided
+      offer: rawOrder.offer || "",
+    };
     const processedOrder = processOrder(order);
 
     // Save order to storage for seller dashboard access
     try {
-      saveOrder(processedOrder);
+      // Add buyer identity to the order if available
+      const orderToSave = {
+        ...processedOrder,
+        buyerId,
+        buyerDiscordId,
+      };
+      saveOrder(orderToSave as typeof processedOrder);
     } catch (saveError) {
       console.error("Failed to save order:", saveError);
       // Continue with notifications even if save fails

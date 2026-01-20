@@ -12,10 +12,14 @@ interface CatalogControlsProps {
   onCategoryFilterChange: (category: BlueprintType | null) => void;
   totalCount: number;
   shownCount: number;
-  // Select mode props
+  // Select mode props (legacy)
   selectMode?: boolean;
   onToggleSelectMode?: () => void;
   selectedCount?: number;
+  // Cart mode props
+  cartItemCount?: number;
+  onEnterCartMode?: () => void;
+  isCartMode?: boolean;
 }
 
 export default function CatalogControls({
@@ -30,6 +34,9 @@ export default function CatalogControls({
   selectMode = false,
   onToggleSelectMode,
   selectedCount = 0,
+  cartItemCount = 0,
+  onEnterCartMode,
+  isCartMode = false,
 }: CatalogControlsProps) {
   return (
     <div className="bg-dark-800 rounded-lg p-4 mb-6">
@@ -62,8 +69,35 @@ export default function CatalogControls({
 
         {/* Controls row */}
         <div className="flex items-center gap-4">
-          {/* Select mode toggle button */}
-          {onToggleSelectMode && (
+          {/* Cart mode button - main action */}
+          {onEnterCartMode && (
+            <button
+              onClick={onEnterCartMode}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                isCartMode
+                  ? "bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40"
+                  : "bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30 hover:bg-neon-cyan/20 hover:border-neon-cyan/50"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              {isCartMode ? "Вибір активний" : "Обрати креслення"}
+              {cartItemCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-neon-cyan/30 rounded text-xs">
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Legacy select mode toggle button (hidden when cart mode is available) */}
+          {onToggleSelectMode && !onEnterCartMode && (
             <button
               onClick={onToggleSelectMode}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${

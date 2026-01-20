@@ -1,31 +1,94 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { Blueprint, BlueprintSelection, getMaxSelectableQty } from "@/lib/types";
-import CheckoutModal from "./CheckoutModal";
+import { Blueprint, BlueprintSelectionWithSeller, SellerListing, formatItemPrice } from "@/lib/types";
+import CheckoutModalWithSeller from "./CheckoutModalWithSeller";
 import QuantitySelector from "./QuantitySelector";
 
 interface BlueprintDetailProps {
   blueprint: Blueprint;
 }
 
+interface SellerWithBlueprintInfo extends SellerListing {
+  blueprintId: string;
+  blueprintName: string;
+  blueprintSlug: string;
+  blueprintImage: string;
+}
+
 export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  const maxQty = getMaxSelectableQty(blueprint);
-  const canBuy = maxQty > 0;
+  // Seller selection state
+  const [sellers, setSellers] = useState<SellerListing[]>([]);
+  const [recommendedSellerId, setRecommendedSellerId] = useState<string | null>(null);
+  const [sellersLoading, setSellersLoading] = useState(true);
+  const [selectedSeller, setSelectedSeller] = useState<SellerListing | null>(null);
 
-  // Create selection for CheckoutModal
-  const selection: BlueprintSelection[] = useMemo(
-    () => [{ blueprint, quantity }],
-    [blueprint, quantity]
-  );
+  // Fetch sellers for this blueprint
+  useEffect(() => {
+    const fetchSellers = async () => {
+      setSellersLoading(true);
+      try {
+        const res = await fetch(`/api/blueprints/${blueprint.id}/sellers`);
+        if (res.ok) {
+          const data = await res.json();
+          setSellers(data.sellers || []);
+
+          // Track recommended seller from queue
+          if (data.recommendedSeller) {
+            setRecommendedSellerId(data.recommendedSeller.sellerId);
+            // Auto-select recommended seller
+            setSelectedSeller(data.recommendedSeller);
+          } else if (data.sellers && data.sellers.length > 0) {
+            // Fallback to first seller if no recommendation
+            setSelectedSeller(data.sellers[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch sellers:", error);
+      } finally {
+        setSellersLoading(false);
+      }
+    };
+
+    fetchSellers();
+  }, [blueprint.id]);
+
+  // Calculate max quantity from selected seller
+  const maxQty = selectedSeller?.quantity || 0;
+  const canBuy = sellers.length > 0 && selectedSeller !== null && maxQty > 0;
+
+  // Reset quantity when seller changes
+  useEffect(() => {
+    if (selectedSeller) {
+      setQuantity((prev) => Math.min(prev, selectedSeller.quantity) || 1);
+    }
+  }, [selectedSeller]);
+
+  // Create selection for CheckoutModal with seller info
+  const selection: BlueprintSelectionWithSeller[] = useMemo(() => {
+    if (!selectedSeller) return [];
+    return [{
+      blueprint,
+      quantity,
+      sellerId: selectedSeller.sellerId,
+      sellerDiscordId: selectedSeller.sellerDiscordId,
+      priceSnapshot: selectedSeller.price,
+    }];
+  }, [blueprint, quantity, selectedSeller]);
 
   // Handle successful order
   const handleOrderSuccess = () => {
     setIsModalOpen(false);
+    setQuantity(1);
+  };
+
+  // Handle seller selection
+  const handleSelectSeller = (seller: SellerListing) => {
+    setSelectedSeller(seller);
     setQuantity(1);
   };
 
@@ -101,8 +164,64 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
                 </div>
               )}
 
-              {/* Quantity selector (only for owned blueprints) */}
-              {canBuy && (
+              {/* Seller selection */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-300 mb-3">Оберіть продавця:</h3>
+
+                {sellersLoading ? (
+                  <div className="p-4 bg-dark-700 rounded-lg border border-dark-600 text-center text-gray-400">
+                    Завантаження продавців...
+                  </div>
+                ) : sellers.length === 0 ? (
+                  <div className="p-4 bg-dark-700 rounded-lg border border-dark-600 text-center text-gray-500">
+                    Наразі немає продавців з цим кресленням
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sellers.map((seller) => {
+                      const isSelected = selectedSeller?.sellerId === seller.sellerId;
+                      return (
+                        <button
+                          key={seller.sellerId}
+                          onClick={() => handleSelectSeller(seller)}
+                          className={`w-full p-3 rounded-lg border transition-all text-left ${
+                            isSelected
+                              ? "bg-neon-cyan/10 border-neon-cyan/50"
+                              : "bg-dark-700 border-dark-600 hover:border-dark-500"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {/* Selection indicator */}
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                isSelected
+                                  ? "border-neon-cyan bg-neon-cyan"
+                                  : "border-gray-500"
+                              }`}>
+                                {isSelected && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-dark-900" />
+                                )}
+                              </div>
+                              {/* Seller info */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-white font-medium">{seller.sellerDiscordId}</span>
+                                <span className="text-gray-500 text-sm">×{seller.quantity}</span>
+                              </div>
+                            </div>
+                            {/* Price */}
+                            <span className={`font-bold ${seller.price ? "text-neon-purple" : "text-gray-500"}`}>
+                              {formatItemPrice(seller.price)}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Quantity selector (only when seller is selected) */}
+              {canBuy && selectedSeller && (
                 <div className="mb-4 p-4 bg-dark-700 rounded-lg border border-dark-600">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-300">Кількість:</span>
@@ -113,9 +232,16 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
                       max={maxQty}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2 text-right">
-                    Доступно: {maxQty}
-                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-xs text-gray-500">
+                      Доступно у продавця: {maxQty}
+                    </p>
+                    {selectedSeller.price && (
+                      <p className="text-sm text-neon-purple font-medium">
+                        Ціна: {formatItemPrice(selectedSeller.price)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -126,26 +252,27 @@ export default function BlueprintDetail({ blueprint }: BlueprintDetailProps) {
                   className="w-full neon-btn py-3 px-6 rounded-lg font-bold text-black"
                 >
                   Купити {quantity > 1 ? "(×" + quantity + ")" : ""}
+                  {selectedSeller?.price ? ` — ${formatItemPrice(selectedSeller.price)}` : ""}
                 </button>
               ) : (
                 <button
                   disabled
                   className="w-full py-3 px-6 rounded-lg font-bold bg-gray-700 text-gray-500 cursor-not-allowed"
                 >
-                  Немає в наявності
+                  {sellersLoading ? "Завантаження..." : "Немає в наявності"}
                 </button>
               )}
 
               <p className="mt-4 text-xs text-gray-500 text-center">
-                Після оформлення я отримаю повідомлення та напишу вам в Discord
+                Після оформлення продавець отримає повідомлення та напише вам в Discord
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Updated: pass selection with quantity */}
-      <CheckoutModal
+      {/* Pass selection with seller info */}
+      <CheckoutModalWithSeller
         selections={selection}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

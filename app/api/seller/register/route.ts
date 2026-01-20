@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { registerSeller, validateDiscordId, validatePassword } from "@/lib/sellers";
+import { registerSeller, validateDiscordId, validatePassword, hashPassword } from "@/lib/sellers";
+import { getBuyerByDiscordId } from "@/lib/buyers";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
+import { createBuyerProfileForSeller } from "@/lib/buyers";
 
 // Rate limit config for registration: 3 attempts per 15 minutes
 const REGISTER_RATE_LIMIT = { maxRequests: 3, windowMs: 15 * 60 * 1000 };
@@ -70,6 +72,21 @@ export async function POST(request: NextRequest) {
         { error: result.error || "Помилка реєстрації" },
         { status: 400 }
       );
+    }
+
+    // UNIFIED ACCOUNT: Also create buyer profile with same credentials
+    // This allows seller to use buyer features immediately
+    const existingBuyer = getBuyerByDiscordId(discordId.trim());
+    if (!existingBuyer) {
+      try {
+        // Get the password hash from the newly created seller
+        const passwordHash = result.seller.passwordHash;
+        await createBuyerProfileForSeller(discordId.trim(), passwordHash);
+        console.log(`Auto-created buyer profile for seller: ${discordId}`);
+      } catch (buyerError) {
+        // Log but don't fail - seller registration succeeded
+        console.error("Failed to auto-create buyer profile:", buyerError);
+      }
     }
 
     return NextResponse.json({

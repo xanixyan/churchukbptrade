@@ -3,12 +3,22 @@ import { validateSellerSession } from "@/lib/auth";
 import { getAllBlueprints } from "@/lib/blueprints";
 import {
   getSellerInventory,
-  updateSellerInventoryBulk,
+  updateSellerInventoryBulkWithPrice,
 } from "@/lib/sellers";
-import { canSellerModifyInventory } from "@/lib/types";
+import {
+  canSellerModifyInventory,
+  validateItemPrice,
+  normalizeItemPrice,
+  ItemPrice,
+  PRICE_TYPES,
+  PRICE_AMOUNT_MIN,
+  PRICE_AMOUNT_MAX,
+  TRADE_BLUEPRINTS_MAX,
+  OTHER_LABEL_MAX_LENGTH,
+} from "@/lib/types";
 
 /**
- * GET /api/seller/inventory - Get seller's inventory with blueprint data
+ * GET /api/seller/inventory - Get seller's inventory with blueprint data and prices
  */
 export async function GET() {
   try {
@@ -29,20 +39,27 @@ export async function GET() {
     // Get seller's inventory
     const inventory = getSellerInventory(seller.id);
 
-    // Create inventory map for quick lookup
+    // Create inventory map for quick lookup (both quantity and price)
     const inventoryMap = new Map(
-      inventory.map((item) => [item.blueprintId, item.quantity])
+      inventory.map((item) => [
+        item.blueprintId,
+        { quantity: item.quantity, price: normalizeItemPrice(item.price) }
+      ])
     );
 
-    // Combine blueprints with seller's quantities
-    const blueprintsWithInventory = blueprints.map((bp) => ({
-      id: bp.id,
-      name: bp.name,
-      slug: bp.slug,
-      image: bp.image,
-      type: bp.type,
-      quantity: inventoryMap.get(bp.id) || 0,
-    }));
+    // Combine blueprints with seller's quantities and prices
+    const blueprintsWithInventory = blueprints.map((bp) => {
+      const inv = inventoryMap.get(bp.id);
+      return {
+        id: bp.id,
+        name: bp.name,
+        slug: bp.slug,
+        image: bp.image,
+        type: bp.type,
+        quantity: inv?.quantity || 0,
+        price: inv?.price || { type: "Договірна" as const },
+      };
+    });
 
     return NextResponse.json({
       seller: {
@@ -51,6 +68,18 @@ export async function GET() {
         status: seller.status,
       },
       blueprints: blueprintsWithInventory,
+      // Provide the full list of blueprints for trade price selection
+      catalogBlueprints: blueprints.map((bp) => ({
+        id: bp.id,
+        name: bp.name,
+      })),
+      priceConfig: {
+        types: PRICE_TYPES,
+        amountMin: PRICE_AMOUNT_MIN,
+        amountMax: PRICE_AMOUNT_MAX,
+        tradeBlueprintsMax: TRADE_BLUEPRINTS_MAX,
+        otherLabelMaxLength: OTHER_LABEL_MAX_LENGTH,
+      },
     });
   } catch (error) {
     console.error("Error fetching seller inventory:", error);
@@ -62,7 +91,30 @@ export async function GET() {
 }
 
 /**
- * PUT /api/seller/inventory - Update seller's inventory (quantity only)
+ * PUT /api/seller/inventory - Update seller's inventory (quantity and price)
+ *
+ * Body format:
+ * {
+ *   updates: [
+ *     {
+ *       blueprintId: string,
+ *       quantity: number,
+ *       price?: ItemPrice  // New price object structure
+ *     }
+ *   ]
+ * }
+ *
+ * Price object structure:
+ * {
+ *   type: "Договірна" | "Пружини" | "Насіння" | "Качки" | "Інші матеріали" | "Блюпринт(-и)",
+ *   amount?: number,           // Required for material types
+ *   otherLabel?: string,       // Required for "Інші матеріали"
+ *   tradeBlueprints?: Array<{  // Required for "Блюпринт(-и)"
+ *     blueprintId: string,
+ *     name?: string,
+ *     qty: number
+ *   }>
+ * }
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -87,7 +139,7 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
     const { updates } = body as {
-      updates: { blueprintId: string; quantity: number }[];
+      updates: { blueprintId: string; quantity: number; price?: ItemPrice | unknown }[];
     };
 
     if (!Array.isArray(updates)) {
@@ -97,10 +149,12 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Validate updates - sellers can only change quantities
-    const validUpdates: { blueprintId: string; quantity: number }[] = [];
+    // Get all blueprints for validation
     const allBlueprints = getAllBlueprints();
     const blueprintIds = new Set(allBlueprints.map((bp) => bp.id));
+
+    // Validate updates
+    const validUpdates: { blueprintId: string; quantity: number; price?: ItemPrice }[] = [];
 
     for (const update of updates) {
       if (!update.blueprintId || typeof update.blueprintId !== "string") {
@@ -114,15 +168,31 @@ export async function PUT(request: NextRequest) {
 
       // Validate quantity
       const qty = Math.max(0, Math.floor(update.quantity || 0));
-      validUpdates.push({ blueprintId: update.blueprintId, quantity: qty });
+
+      // Validate price if provided
+      let price: ItemPrice | undefined = undefined;
+
+      if (update.price !== undefined) {
+        // Validate the price object
+        const priceValidation = validateItemPrice(update.price, blueprintIds);
+        if (!priceValidation.valid) {
+          return NextResponse.json(
+            { error: `${update.blueprintId}: ${priceValidation.error}` },
+            { status: 400 }
+          );
+        }
+        price = normalizeItemPrice(update.price);
+      }
+
+      validUpdates.push({ blueprintId: update.blueprintId, quantity: qty, price });
     }
 
-    // Apply updates
-    const success = updateSellerInventoryBulk(seller.id, validUpdates);
+    // Apply updates with price support
+    const result = await updateSellerInventoryBulkWithPrice(seller.id, validUpdates, blueprintIds);
 
-    if (!success) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: "Failed to update inventory" },
+        { error: result.error || "Failed to update inventory" },
         { status: 500 }
       );
     }

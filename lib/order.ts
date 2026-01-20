@@ -1,8 +1,8 @@
 // Order types and validation
 import crypto from "crypto";
-import { resolveOrderToSellers, getActiveSellers, requiresMultipleSellers } from "./sellers";
+import { resolveOrderToSellers, resolveOrderToRequestedSellers, getActiveSellers, requiresMultipleSellers } from "./sellers";
 import { getBlueprintById } from "./blueprints";
-import { SellerOrderGroup } from "./types";
+import { SellerOrderGroup, ItemPrice, normalizeItemPrice } from "./types";
 
 // Fixed message for multi-seller orders (Ukrainian)
 export const MULTI_SELLER_OFFER_MESSAGE =
@@ -12,6 +12,10 @@ export interface OrderItem {
   id: string;
   name: string;
   quantity: number;
+  // Optional seller info for direct seller selection
+  sellerId?: string;
+  sellerDiscordId?: string;
+  priceSnapshot?: ItemPrice;
 }
 
 export interface OrderRequest {
@@ -56,9 +60,31 @@ export function generateOrderId(): string {
 }
 
 /**
- * Validate order request (Ukrainian error messages)
+ * Check if any item has negotiable price (requires offer)
  */
-export function validateOrder(data: unknown): OrderValidationResult {
+function hasNegotiablePriceInItems(items: unknown[]): boolean {
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const i = item as Record<string, unknown>;
+    // If no priceSnapshot, assume negotiable (legacy behavior)
+    if (!i.priceSnapshot) return true;
+    const price = i.priceSnapshot as Record<string, unknown>;
+    // If price type is "Договірна" or missing, it's negotiable
+    if (!price.type || price.type === "Договірна") return true;
+  }
+  return false;
+}
+
+/**
+ * Validate order request (Ukrainian error messages)
+ * @param data - The order request data
+ * @param options - Validation options
+ *   - skipDiscordValidation: Skip discord validation (for logged-in buyers)
+ */
+export function validateOrder(
+  data: unknown,
+  options?: { skipDiscordValidation?: boolean }
+): OrderValidationResult {
   const errors: OrderValidationError[] = [];
 
   if (!data || typeof data !== "object") {
@@ -72,29 +98,37 @@ export function validateOrder(data: unknown): OrderValidationResult {
     return { valid: false, errors: [{ field: "spam", message: "Запит відхилено" }] };
   }
 
-  // Discord nickname validation
-  if (!order.discordNick || typeof order.discordNick !== "string") {
-    errors.push({ field: "discordNick", message: "Discord нікнейм обов'язковий" });
-  } else {
-    const nick = order.discordNick.trim();
-    if (nick.length === 0) {
+  // Discord nickname validation (skip for logged-in buyers - will be set from session)
+  if (!options?.skipDiscordValidation) {
+    if (!order.discordNick || typeof order.discordNick !== "string") {
       errors.push({ field: "discordNick", message: "Discord нікнейм обов'язковий" });
-    } else if (nick.length > 64) {
-      errors.push({ field: "discordNick", message: "Discord нікнейм занадто довгий (макс. 64 символи)" });
+    } else {
+      const nick = order.discordNick.trim();
+      if (nick.length === 0) {
+        errors.push({ field: "discordNick", message: "Discord нікнейм обов'язковий" });
+      } else if (nick.length > 64) {
+        errors.push({ field: "discordNick", message: "Discord нікнейм занадто довгий (макс. 64 символи)" });
+      }
     }
   }
 
-  // Offer validation (required)
-  if (!order.offer || typeof order.offer !== "string") {
-    errors.push({ field: "offer", message: "Вкажіть, що пропонуєте взамін" });
-  } else {
+  // Determine if offer is required based on price types
+  const items = order.items as unknown[] | undefined;
+  const isOfferRequired = !items || items.length === 0 || hasNegotiablePriceInItems(items);
+
+  // Offer validation (required only for negotiable prices)
+  if (order.offer && typeof order.offer === "string") {
     const offer = order.offer.trim();
-    if (offer.length === 0) {
-      errors.push({ field: "offer", message: "Вкажіть, що пропонуєте взамін" });
-    } else if (offer.length > 500) {
+    if (offer.length > 500) {
       errors.push({ field: "offer", message: "Пропозиція занадто довга (макс. 500 символів)" });
     }
+  } else if (isOfferRequired) {
+    // Offer is required but missing or empty
+    if (!order.offer || typeof order.offer !== "string" || order.offer.trim().length === 0) {
+      errors.push({ field: "offer", message: "Вкажіть, що пропонуєте взамін (для договірної ціни)" });
+    }
   }
+  // If not required, empty offer is allowed
 
   // Notes validation (optional)
   if (order.notes && typeof order.notes === "string" && order.notes.length > 500) {
@@ -126,6 +160,12 @@ export function validateOrder(data: unknown): OrderValidationResult {
         if (typeof item.quantity !== "number" || item.quantity < 1 || item.quantity > 999) {
           errors.push({ field: `items[${i}].quantity`, message: "Невірна кількість (1-999)" });
         }
+        // Validate seller info if provided
+        if (item.sellerId !== undefined) {
+          if (typeof item.sellerId !== "string" || item.sellerId.trim() === "") {
+            errors.push({ field: `items[${i}].sellerId`, message: "Невірний ID продавця" });
+          }
+        }
       }
     }
   }
@@ -138,35 +178,66 @@ export function validateOrder(data: unknown): OrderValidationResult {
 
 /**
  * Process order and resolve to sellers
+ * Supports two modes:
+ * 1. With seller selection: items have sellerId, route directly to those sellers
+ * 2. Without seller selection: resolve items to all available sellers (legacy)
  */
 export function processOrder(order: OrderRequest): ProcessedOrder {
   const orderId = generateOrderId();
   const createdAt = new Date().toISOString();
 
-  // Map items to include blueprint names from catalog
-  const itemsWithNames = order.items.map((item) => {
-    const blueprint = getBlueprintById(item.id);
-    return {
-      blueprintId: item.id,
-      blueprintName: blueprint?.name || item.name,
-      quantity: item.quantity,
-    };
-  });
+  // Check if any item has seller info (new flow with seller selection)
+  const hasSellerSelection = order.items.some((item) => item.sellerId);
 
-  // Resolve which sellers have these blueprints
-  const sellerGroups = resolveOrderToSellers(itemsWithNames);
+  let sellerGroups: SellerOrderGroup[];
+  let isMultiSeller: boolean;
+
+  if (hasSellerSelection) {
+    // New flow: items have explicit seller assignment
+    // Build items with seller info for direct resolution
+    const itemsWithSellers = order.items.map((item) => {
+      const blueprint = getBlueprintById(item.id);
+      return {
+        blueprintId: item.id,
+        blueprintName: blueprint?.name || item.name,
+        quantity: item.quantity,
+        sellerId: item.sellerId!,
+        sellerDiscordId: item.sellerDiscordId,
+        priceSnapshot: item.priceSnapshot ? normalizeItemPrice(item.priceSnapshot) : { type: "Договірна" as const },
+      };
+    });
+
+    // Resolve to requested sellers (validates availability)
+    const resolution = resolveOrderToRequestedSellers(itemsWithSellers);
+    sellerGroups = resolution.sellerGroups;
+
+    // Multi-seller if items go to different sellers
+    const uniqueSellers = new Set(order.items.map((i) => i.sellerId));
+    isMultiSeller = uniqueSellers.size > 1;
+  } else {
+    // Legacy flow: resolve items to all available sellers
+    const itemsWithNames = order.items.map((item) => {
+      const blueprint = getBlueprintById(item.id);
+      return {
+        blueprintId: item.id,
+        blueprintName: blueprint?.name || item.name,
+        quantity: item.quantity,
+      };
+    });
+
+    // Resolve which sellers have these blueprints
+    sellerGroups = resolveOrderToSellers(itemsWithNames);
+
+    // Check if order REQUIRES multiple sellers to fulfill
+    const itemsForCheck = order.items.map((item) => ({
+      blueprintId: item.id,
+      quantity: item.quantity,
+    }));
+    isMultiSeller = requiresMultipleSellers(itemsForCheck);
+  }
 
   // Number of sellers who have any of the ordered items
   const sellerCount = sellerGroups.length;
-
-  // Check if order REQUIRES multiple sellers to fulfill
-  // This is true ONLY if no single seller can fulfill ALL items
-  // Example: Single blueprint with multiple sellers -> isMultiSeller = false
-  const itemsForCheck = order.items.map((item) => ({
-    blueprintId: item.id,
-    quantity: item.quantity,
-  }));
-  const isMultiSeller = requiresMultipleSellers(itemsForCheck);
 
   const originalOffer = order.offer.trim();
 
@@ -250,7 +321,22 @@ export function formatSellerTelegramMessage(
       const status = item.available
         ? `✅ Є в наявності (${item.availableQty} шт.)`
         : `❌ Немає в наявності (${item.availableQty} шт.)`;
-      return `  • ${item.blueprintName} ×${item.requestedQty}\n    ${status}`;
+      // Format price based on new ItemPrice structure
+      let priceInfo = "";
+      if (item.priceSnapshot) {
+        const p = item.priceSnapshot;
+        if (p.type === "Договірна") {
+          priceInfo = " — Договірна";
+        } else if (p.type === "Блюпринт(-и)" && p.tradeBlueprints) {
+          const trades = p.tradeBlueprints.map(t => `${t.name || t.blueprintId} x${t.qty}`).join(", ");
+          priceInfo = ` — Обмін на: ${trades}`;
+        } else if (p.type === "Інші матеріали" && p.otherLabel) {
+          priceInfo = ` — ${p.amount} ${p.otherLabel}`;
+        } else if (p.amount) {
+          priceInfo = ` — ${p.amount} ${p.type}`;
+        }
+      }
+      return `  • ${item.blueprintName} ×${item.requestedQty}${priceInfo}\n    ${status}`;
     })
     .join("\n\n");
 

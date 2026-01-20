@@ -4,6 +4,8 @@ import {
   UserRole,
   SessionData,
   Seller,
+  Buyer,
+  User,
   canSellerAccessDashboard,
   isSellerPendingVerification,
   isSellerBlocked,
@@ -14,6 +16,18 @@ import {
   getSellerById,
   authenticateSellerWithPassword,
 } from "./sellers";
+import {
+  getBuyerById,
+  getBuyerByDiscordId,
+  authenticateBuyer,
+} from "./buyers";
+import {
+  getUserByDiscordId,
+  getUserById,
+  authenticateUser,
+  userHasRole,
+  ensureUserFromLegacy,
+} from "./users";
 
 const SESSION_COOKIE_NAME = "session_token";
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -136,6 +150,9 @@ export async function createAdminSession(): Promise<string> {
 
   sessions.set(token, {
     role: "admin",
+    roles: ["admin"],
+    userId: "admin",
+    discordId: "admin",
     expiresAt,
   });
 
@@ -202,15 +219,77 @@ export async function authenticateSeller(
 }
 
 /**
- * Create seller session
+ * Create seller session (legacy - kept for backward compatibility)
  */
-export async function createSellerSession(sellerId: string): Promise<string> {
+export async function createSellerSession(sellerId: string, discordId: string): Promise<string> {
   const token = generateSessionToken();
   const expiresAt = Date.now() + SESSION_DURATION_MS;
 
+  // Check if user also has buyer role
+  const buyer = getBuyerByDiscordId(discordId);
+  const roles: UserRole[] = ["seller"];
+  if (buyer) {
+    roles.push("buyer");
+  }
+
   sessions.set(token, {
     role: "seller",
+    roles,
+    userId: sellerId,
+    discordId,
     sellerId,
+    buyerId: buyer?.id,
+    expiresAt,
+  });
+
+  cleanupExpiredSessions();
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, token, getCookieOptions());
+
+  return token;
+}
+
+// ============================================
+// BUYER AUTHENTICATION
+// ============================================
+
+/**
+ * Authenticate buyer by Discord ID and password
+ * Returns buyer if credentials are valid
+ */
+export async function authenticateBuyerWithPassword(
+  discordId: string,
+  password: string
+): Promise<{
+  success: boolean;
+  buyer?: Buyer;
+  error?: string;
+}> {
+  return authenticateBuyer(discordId, password);
+}
+
+/**
+ * Create buyer session (legacy - kept for backward compatibility)
+ */
+export async function createBuyerSession(buyerId: string, discordId: string): Promise<string> {
+  const token = generateSessionToken();
+  const expiresAt = Date.now() + SESSION_DURATION_MS;
+
+  // Check if user also has seller role (active seller only)
+  const seller = getSellerByDiscordId(discordId);
+  const roles: UserRole[] = ["buyer"];
+  if (seller && canSellerAccessDashboard(seller)) {
+    roles.push("seller");
+  }
+
+  sessions.set(token, {
+    role: "buyer",
+    roles,
+    userId: buyerId,
+    discordId,
+    buyerId,
+    sellerId: seller?.id,
     expiresAt,
   });
 
@@ -268,12 +347,13 @@ export async function validateSellerSession(): Promise<{
 }> {
   const session = await getSession();
 
-  if (!session || session.role !== "seller" || !session.sellerId) {
+  const sellerId = session?.sellerId || (session?.role === "seller" ? session?.userId : undefined);
+  if (!session || session.role !== "seller" || !sellerId) {
     return { valid: false };
   }
 
   // Fetch current seller data to check status
-  const seller = getSellerById(session.sellerId);
+  const seller = getSellerById(sellerId);
   if (!seller) {
     return { valid: false };
   }
@@ -287,14 +367,42 @@ export async function validateSellerSession(): Promise<{
 }
 
 /**
+ * Validate session and check if user is buyer
+ * Returns buyer data if valid
+ */
+export async function validateBuyerSession(): Promise<{
+  valid: boolean;
+  buyer?: Buyer;
+}> {
+  const session = await getSession();
+
+  const buyerId = session?.buyerId || (session?.role === "buyer" ? session?.userId : undefined);
+  if (!session || session.role !== "buyer" || !buyerId) {
+    return { valid: false };
+  }
+
+  // Fetch current buyer data
+  const buyer = getBuyerById(buyerId);
+  if (!buyer) {
+    return { valid: false };
+  }
+
+  return { valid: true, buyer };
+}
+
+/**
  * Validate session for any authenticated user
- * Returns role and seller data if applicable
+ * Returns role and user data if applicable
  */
 export async function validateSession(): Promise<{
   authenticated: boolean;
   role?: UserRole;
+  userId?: string;
+  discordId?: string;
   sellerId?: string;
   seller?: Seller;
+  buyerId?: string;
+  buyer?: Buyer;
 }> {
   const session = await getSession();
 
@@ -303,18 +411,45 @@ export async function validateSession(): Promise<{
   }
 
   if (session.role === "admin") {
-    return { authenticated: true, role: "admin" };
+    return {
+      authenticated: true,
+      role: "admin",
+      userId: "admin",
+      discordId: "admin",
+    };
   }
 
-  if (session.role === "seller" && session.sellerId) {
-    const seller = getSellerById(session.sellerId);
-    if (seller && canSellerAccessDashboard(seller)) {
-      return {
-        authenticated: true,
-        role: "seller",
-        sellerId: session.sellerId,
-        seller,
-      };
+  if (session.role === "seller") {
+    const sellerId = session.sellerId || session.userId;
+    if (sellerId) {
+      const seller = getSellerById(sellerId);
+      if (seller && canSellerAccessDashboard(seller)) {
+        return {
+          authenticated: true,
+          role: "seller",
+          userId: sellerId,
+          discordId: session.discordId || seller.discordId,
+          sellerId,
+          seller,
+        };
+      }
+    }
+  }
+
+  if (session.role === "buyer") {
+    const buyerId = session.buyerId || session.userId;
+    if (buyerId) {
+      const buyer = getBuyerById(buyerId);
+      if (buyer) {
+        return {
+          authenticated: true,
+          role: "buyer",
+          userId: buyerId,
+          discordId: session.discordId || buyer.discordId,
+          buyerId,
+          buyer,
+        };
+      }
     }
   }
 
@@ -390,4 +525,356 @@ export async function canEditSellerInventory(targetSellerId: string): Promise<bo
   }
 
   return false;
+}
+
+// ============================================
+// UNIFIED MULTI-ROLE AUTHENTICATION
+// ============================================
+
+/**
+ * Create a unified session with all user's roles
+ * This is the preferred method for new code
+ */
+export async function createUnifiedSession(
+  discordId: string,
+  activeRole: UserRole
+): Promise<{ success: boolean; token?: string; error?: string }> {
+  // Get user's profiles to determine all roles
+  const buyer = getBuyerByDiscordId(discordId);
+  const seller = getSellerByDiscordId(discordId);
+
+  const roles: UserRole[] = [];
+  let buyerId: string | undefined;
+  let sellerId: string | undefined;
+
+  // Add buyer role if buyer profile exists
+  if (buyer) {
+    roles.push("buyer");
+    buyerId = buyer.id;
+  }
+
+  // Add seller role only if seller profile exists AND is active
+  if (seller && canSellerAccessDashboard(seller)) {
+    roles.push("seller");
+    sellerId = seller.id;
+  }
+
+  // Validate that user has the requested active role
+  if (!roles.includes(activeRole)) {
+    return {
+      success: false,
+      error: activeRole === "seller"
+        ? "Немає активного облікового запису продавця"
+        : "Немає облікового запису покупця",
+    };
+  }
+
+  const token = generateSessionToken();
+  const expiresAt = Date.now() + SESSION_DURATION_MS;
+
+  // Determine userId based on active role
+  const userId = activeRole === "seller" ? sellerId! : buyerId!;
+
+  sessions.set(token, {
+    role: activeRole,
+    roles,
+    userId,
+    discordId,
+    buyerId,
+    sellerId,
+    expiresAt,
+  });
+
+  cleanupExpiredSessions();
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, token, getCookieOptions());
+
+  return { success: true, token };
+}
+
+/**
+ * Switch the active role in current session
+ * User must already have the target role
+ */
+export async function switchActiveRole(
+  newRole: UserRole
+): Promise<{ success: boolean; error?: string }> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+
+  if (!token) {
+    return { success: false, error: "Сесія не знайдена" };
+  }
+
+  const session = sessions.get(token);
+  if (!session) {
+    return { success: false, error: "Сесія недійсна" };
+  }
+
+  // Check if session has roles array (for backward compatibility)
+  const roles = session.roles || [session.role];
+
+  // Check if user has the requested role
+  if (!roles.includes(newRole)) {
+    return {
+      success: false,
+      error: newRole === "seller"
+        ? "Немає активного облікового запису продавця"
+        : "Немає облікового запису покупця",
+    };
+  }
+
+  // Additional check for seller: verify seller is still active
+  if (newRole === "seller" && session.sellerId) {
+    const seller = getSellerById(session.sellerId);
+    if (!seller || !canSellerAccessDashboard(seller)) {
+      return {
+        success: false,
+        error: "Обліковий запис продавця неактивний",
+      };
+    }
+  }
+
+  // Update the active role
+  session.role = newRole;
+  session.userId = newRole === "seller" ? session.sellerId! : session.buyerId!;
+
+  sessions.set(token, session);
+
+  return { success: true };
+}
+
+/**
+ * Get current session with all roles
+ * Extended version that includes roles array
+ */
+export async function getSessionWithRoles(): Promise<{
+  authenticated: boolean;
+  role?: UserRole;
+  roles?: UserRole[];
+  userId?: string;
+  discordId?: string;
+  sellerId?: string;
+  seller?: Seller;
+  sellerPending?: boolean; // True if seller exists but is pending verification
+  buyerId?: string;
+  buyer?: Buyer;
+}> {
+  const session = await getSession();
+
+  if (!session) {
+    return { authenticated: false };
+  }
+
+  if (session.role === "admin") {
+    return {
+      authenticated: true,
+      role: "admin",
+      roles: ["admin"],
+      userId: "admin",
+      discordId: "admin",
+    };
+  }
+
+  // Build complete role/profile information
+  let seller: Seller | undefined;
+  let buyer: Buyer | undefined;
+  let sellerPending = false;
+  const roles: UserRole[] = session.roles || [];
+
+  // Get seller profile if sellerId exists
+  if (session.sellerId) {
+    const s = getSellerById(session.sellerId);
+    if (s) {
+      if (canSellerAccessDashboard(s)) {
+        seller = s;
+        if (!roles.includes("seller")) roles.push("seller");
+      } else if (isSellerPendingVerification(s)) {
+        sellerPending = true;
+      }
+    }
+  }
+
+  // Get buyer profile if buyerId exists
+  if (session.buyerId) {
+    const b = getBuyerById(session.buyerId);
+    if (b) {
+      buyer = b;
+      if (!roles.includes("buyer")) roles.push("buyer");
+    }
+  }
+
+  // Fallback: try to find profiles by discordId if not in session
+  if (!seller && !buyer && session.discordId) {
+    const s = getSellerByDiscordId(session.discordId);
+    if (s && canSellerAccessDashboard(s)) {
+      seller = s;
+      if (!roles.includes("seller")) roles.push("seller");
+    } else if (s && isSellerPendingVerification(s)) {
+      sellerPending = true;
+    }
+
+    const b = getBuyerByDiscordId(session.discordId);
+    if (b) {
+      buyer = b;
+      if (!roles.includes("buyer")) roles.push("buyer");
+    }
+  }
+
+  // Validate current role is still valid
+  let currentRole = session.role;
+  if (currentRole === "seller" && !seller) {
+    // Seller role no longer valid, switch to buyer if available
+    if (buyer) {
+      currentRole = "buyer";
+    } else {
+      return { authenticated: false };
+    }
+  }
+  if (currentRole === "buyer" && !buyer) {
+    // Buyer role no longer valid, switch to seller if available
+    if (seller) {
+      currentRole = "seller";
+    } else {
+      return { authenticated: false };
+    }
+  }
+
+  return {
+    authenticated: true,
+    role: currentRole,
+    roles,
+    userId: currentRole === "seller" ? seller?.id : buyer?.id,
+    discordId: session.discordId,
+    sellerId: seller?.id,
+    seller,
+    sellerPending,
+    buyerId: buyer?.id,
+    buyer,
+  };
+}
+
+/**
+ * Unified login that handles both buyer and seller roles
+ * Returns all roles the user has access to
+ * Includes lazy backfill: auto-creates buyer profile for sellers if missing
+ */
+export async function unifiedLogin(
+  discordId: string,
+  password: string,
+  preferredRole?: UserRole
+): Promise<{
+  success: boolean;
+  roles?: UserRole[];
+  activeRole?: UserRole;
+  seller?: Seller;
+  buyer?: Buyer;
+  sellerPending?: boolean;
+  error?: string;
+}> {
+  // Try to authenticate as seller first (sellers have more restrictions)
+  const sellerAuthResult = await authenticateSellerWithPassword(discordId, password);
+  let buyerAuthResult = await authenticateBuyer(discordId, password);
+
+  // Determine available roles
+  const roles: UserRole[] = [];
+  let seller: Seller | undefined;
+  let buyer: Buyer | undefined;
+  let sellerPending = false;
+
+  // LAZY BACKFILL: If seller authenticated but no buyer exists, auto-create buyer profile
+  if (sellerAuthResult.success && sellerAuthResult.seller && !buyerAuthResult.success) {
+    // Check if buyer exists (it might fail auth for other reasons)
+    const existingBuyer = getBuyerByDiscordId(discordId);
+    if (!existingBuyer && sellerAuthResult.seller.passwordHash) {
+      // Auto-create buyer profile using seller's password hash
+      try {
+        const { createBuyerProfileForSeller } = await import("./buyers");
+        const backfillResult = await createBuyerProfileForSeller(
+          discordId,
+          sellerAuthResult.seller.passwordHash
+        );
+        if (backfillResult.success && backfillResult.buyer) {
+          console.log(`[LazyBackfill] Created buyer profile for seller on login: ${discordId}`);
+          // Re-try buyer auth with the new profile
+          buyerAuthResult = { success: true, buyer: backfillResult.buyer };
+        }
+      } catch (error) {
+        console.error(`[LazyBackfill] Failed to create buyer for ${discordId}:`, error);
+      }
+    }
+  }
+
+  if (buyerAuthResult.success && buyerAuthResult.buyer) {
+    roles.push("buyer");
+    buyer = buyerAuthResult.buyer;
+  }
+
+  if (sellerAuthResult.success && sellerAuthResult.seller) {
+    // Check seller status
+    if (canSellerAccessDashboard(sellerAuthResult.seller)) {
+      roles.push("seller");
+      seller = sellerAuthResult.seller;
+    } else if (isSellerPendingVerification(sellerAuthResult.seller)) {
+      sellerPending = true;
+      // LAZY BACKFILL: Even pending sellers should get buyer access
+      // If we created a buyer profile above, they can still use buyer features
+    }
+  }
+
+  // If no roles available, return error
+  if (roles.length === 0) {
+    // Return most specific error message
+    if (sellerPending) {
+      return {
+        success: false,
+        sellerPending: true,
+        error: "Обліковий запис продавця очікує підтвердження",
+      };
+    }
+    // Generic error for security
+    return {
+      success: false,
+      error: "Невірні облікові дані",
+    };
+  }
+
+  // Determine active role
+  let activeRole: UserRole;
+  if (preferredRole && roles.includes(preferredRole)) {
+    activeRole = preferredRole;
+  } else {
+    // Default to buyer if available, otherwise seller
+    activeRole = roles.includes("buyer") ? "buyer" : "seller";
+  }
+
+  // Create unified session
+  const sessionResult = await createUnifiedSession(discordId, activeRole);
+  if (!sessionResult.success) {
+    return {
+      success: false,
+      error: sessionResult.error || "Помилка створення сесії",
+    };
+  }
+
+  return {
+    success: true,
+    roles,
+    activeRole,
+    seller,
+    buyer,
+    sellerPending,
+  };
+}
+
+/**
+ * Check if user has a specific role (based on current session)
+ */
+export async function sessionHasRole(role: UserRole): Promise<boolean> {
+  const session = await getSessionWithRoles();
+  if (!session.authenticated || !session.roles) {
+    return false;
+  }
+  return session.roles.includes(role);
 }

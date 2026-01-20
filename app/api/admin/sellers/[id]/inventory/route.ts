@@ -120,7 +120,7 @@ export async function PUT(
       validUpdates.push({ blueprintId: update.blueprintId, quantity: qty });
     }
 
-    const success = updateSellerInventoryBulk(sellerId, validUpdates);
+    const success = await updateSellerInventoryBulk(sellerId, validUpdates);
     if (!success) {
       return NextResponse.json(
         { error: "Failed to update inventory" },

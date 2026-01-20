@@ -5,14 +5,17 @@
 #
 # Build:  docker build -f Dockerfile.dev -t churchukbptrade-dev .
 # Run:    docker run -p 3000:3000 -v ${PWD}:/app -v /app/node_modules churchukbptrade-dev
+#
+# Run tests:
+#   docker-compose -f docker-compose.dev.yml run --rm web npm run test:concurrency
 # ============================================================================
 
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies for native modules
-RUN apk add --no-cache libc6-compat
+# Install dependencies for native modules (bcrypt requires build tools)
+RUN apk add --no-cache libc6-compat python3 make g++
 
 # Copy package files
 COPY package.json package-lock.json* ./
@@ -22,6 +25,9 @@ RUN npm install
 
 # Copy source (will be overwritten by volume mount)
 COPY . .
+
+# Create data directories with proper permissions
+RUN mkdir -p /app/data/sellers /app/data/orders
 
 # Expose development port
 EXPOSE 3000

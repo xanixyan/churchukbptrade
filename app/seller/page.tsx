@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { BLUEPRINT_TYPES, BlueprintType } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import {
+  BLUEPRINT_TYPES,
+  BlueprintType,
+  ItemPrice,
+  PriceType,
+  PRICE_TYPES,
+  formatItemPrice,
+  TradeBlueprintItem,
+} from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNewOrderNotification } from "@/hooks/useNewOrderNotification";
 
@@ -12,6 +21,20 @@ interface BlueprintWithQuantity {
   image: string;
   type: BlueprintType;
   quantity: number;
+  price: ItemPrice;
+}
+
+interface CatalogBlueprint {
+  id: string;
+  name: string;
+}
+
+interface PriceConfig {
+  types: readonly PriceType[];
+  amountMin: number;
+  amountMax: number;
+  tradeBlueprintsMax: number;
+  otherLabelMaxLength: number;
 }
 
 interface SellerInfo {
@@ -29,6 +52,8 @@ interface OrderItem {
   requestedQty: number;
   available: boolean;
   availableQty: number;
+  // Price snapshot from when buyer added to cart
+  priceSnapshot?: ItemPrice;
   claimStatus: ItemClaimStatus;
   claimedByMe: boolean;
   claimedBySellerId?: string;
@@ -53,12 +78,15 @@ interface SellerOrder {
 }
 
 interface PendingChange {
-  quantity: number;
+  quantity?: number;
+  price?: ItemPrice;
 }
 
 export default function SellerDashboard() {
+  const router = useRouter();
+
   // Global auth context
-  const { setAuthState: setGlobalAuthState } = useAuth();
+  const { setAuthState: setGlobalAuthState, role: globalRole, isLoading: globalAuthLoading } = useAuth();
 
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -71,8 +99,14 @@ export default function SellerDashboard() {
 
   // Blueprints state
   const [blueprints, setBlueprints] = useState<BlueprintWithQuantity[]>([]);
+  const [catalogBlueprints, setCatalogBlueprints] = useState<CatalogBlueprint[]>([]);
+  const [priceConfig, setPriceConfig] = useState<PriceConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Price editor modal state
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [editingPrice, setEditingPrice] = useState<ItemPrice>({ type: "Договірна" });
 
   // Pending changes (blueprintId -> changes)
   const [pendingChanges, setPendingChanges] = useState<Map<string, PendingChange>>(new Map());
@@ -137,10 +171,19 @@ export default function SellerDashboard() {
     setTimeout(() => setCopyToast(null), 2000);
   }, []);
 
-  // Check auth on mount
+  // Check auth on mount and redirect if buyer
   useEffect(() => {
+    // Wait for global auth to load
+    if (globalAuthLoading) return;
+
+    // If logged in as buyer, redirect to buyer dashboard
+    if (globalRole === "buyer") {
+      router.push("/buyer");
+      return;
+    }
+
     checkAuth();
-  }, []);
+  }, [globalAuthLoading, globalRole, router]);
 
   // Initialize audio and attach unlock listener when authenticated
   useEffect(() => {
@@ -200,7 +243,7 @@ export default function SellerDashboard() {
         setIsAuthenticated(true);
         setSeller(data.seller);
         // Update global auth state immediately for header
-        setGlobalAuthState(true, data.seller);
+        setGlobalAuthState(true, "seller", data.seller);
         setDiscordId("");
         setPassword("");
         fetchInventory();
@@ -224,7 +267,7 @@ export default function SellerDashboard() {
       setIsAuthenticated(false);
       setSeller(null);
       // Update global auth state immediately for header
-      setGlobalAuthState(false, null);
+      setGlobalAuthState(false, null, null);
       setBlueprints([]);
       setPendingChanges(new Map());
       setOrders([]);
@@ -249,6 +292,10 @@ export default function SellerDashboard() {
       }
       const data = await res.json();
       setBlueprints(data.blueprints || []);
+      setCatalogBlueprints(data.catalogBlueprints || []);
+      if (data.priceConfig) {
+        setPriceConfig(data.priceConfig);
+      }
       if (data.seller) {
         setSeller(data.seller);
       }
@@ -427,10 +474,22 @@ export default function SellerDashboard() {
   const getCurrentQuantity = useCallback(
     (bp: BlueprintWithQuantity): number => {
       const pending = pendingChanges.get(bp.id);
-      if (pending !== undefined) {
+      if (pending?.quantity !== undefined) {
         return pending.quantity;
       }
       return bp.quantity;
+    },
+    [pendingChanges]
+  );
+
+  // Get current price for a blueprint (pending or original)
+  const getCurrentPrice = useCallback(
+    (bp: BlueprintWithQuantity): ItemPrice => {
+      const pending = pendingChanges.get(bp.id);
+      if (pending !== undefined && "price" in pending && pending.price !== undefined) {
+        return pending.price;
+      }
+      return bp.price;
     },
     [pendingChanges]
   );
@@ -444,11 +503,26 @@ export default function SellerDashboard() {
         if (!bp) return prev;
 
         const newQty = Math.max(0, Math.floor(quantity));
+        const existingPending = newMap.get(blueprintId);
+        const pendingPrice = existingPending?.price;
+        const hasPrice = existingPending !== undefined && "price" in existingPending;
 
-        if (newQty === bp.quantity) {
+        // Check if quantity is same as original
+        const qtyUnchanged = newQty === bp.quantity;
+        // Check if price is same as original (or not changed at all)
+        const priceUnchanged = !hasPrice || pendingPrice === bp.price;
+
+        if (qtyUnchanged && priceUnchanged) {
           newMap.delete(blueprintId);
+        } else if (qtyUnchanged && hasPrice) {
+          // Only price changed, remove quantity from pending
+          newMap.set(blueprintId, { price: pendingPrice });
         } else {
-          newMap.set(blueprintId, { quantity: newQty });
+          // Quantity changed, preserve price if set
+          newMap.set(blueprintId, {
+            quantity: newQty,
+            ...(hasPrice ? { price: pendingPrice } : {}),
+          });
         }
 
         return newMap;
@@ -456,6 +530,59 @@ export default function SellerDashboard() {
       setSaveMessage("");
     },
     [blueprints]
+  );
+
+  // Check if two ItemPrice objects are equal
+  const arePricesEqual = useCallback((a: ItemPrice, b: ItemPrice): boolean => {
+    if (a.type !== b.type) return false;
+    if (a.amount !== b.amount) return false;
+    if (a.otherLabel !== b.otherLabel) return false;
+    // Compare tradeBlueprints arrays
+    const aBlueprints = a.tradeBlueprints || [];
+    const bBlueprints = b.tradeBlueprints || [];
+    if (aBlueprints.length !== bBlueprints.length) return false;
+    for (let i = 0; i < aBlueprints.length; i++) {
+      if (aBlueprints[i].blueprintId !== bBlueprints[i].blueprintId) return false;
+      if (aBlueprints[i].qty !== bBlueprints[i].qty) return false;
+    }
+    return true;
+  }, []);
+
+  // Update price
+  const updatePrice = useCallback(
+    (blueprintId: string, price: ItemPrice) => {
+      setPendingChanges((prev) => {
+        const newMap = new Map(prev);
+        const bp = blueprints.find((b) => b.id === blueprintId);
+        if (!bp) return prev;
+
+        const existingPending = newMap.get(blueprintId);
+        const pendingQty = existingPending?.quantity;
+        const hasQty = existingPending !== undefined && "quantity" in existingPending;
+
+        // Check if price is same as original
+        const priceUnchanged = arePricesEqual(price, bp.price);
+        // Check if quantity is same as original (or not changed at all)
+        const qtyUnchanged = !hasQty || pendingQty === bp.quantity;
+
+        if (priceUnchanged && qtyUnchanged) {
+          newMap.delete(blueprintId);
+        } else if (priceUnchanged && hasQty) {
+          // Only quantity changed, remove price from pending
+          newMap.set(blueprintId, { quantity: pendingQty });
+        } else {
+          // Price changed, preserve quantity if set
+          newMap.set(blueprintId, {
+            price,
+            ...(hasQty ? { quantity: pendingQty } : {}),
+          });
+        }
+
+        return newMap;
+      });
+      setSaveMessage("");
+    },
+    [blueprints, arePricesEqual]
   );
 
   const resetChanges = useCallback(() => {
@@ -469,10 +596,16 @@ export default function SellerDashboard() {
     setIsSaving(true);
     setSaveMessage("");
 
-    const updates = Array.from(pendingChanges.entries()).map(([blueprintId, changes]) => ({
-      blueprintId,
-      quantity: changes.quantity,
-    }));
+    const updates = Array.from(pendingChanges.entries()).map(([blueprintId, changes]) => {
+      const bp = blueprints.find((b) => b.id === blueprintId);
+      return {
+        blueprintId,
+        // Use pending quantity if set, otherwise use original
+        quantity: changes.quantity !== undefined ? changes.quantity : (bp?.quantity ?? 0),
+        // Include price if it was explicitly changed (even to null)
+        ...("price" in changes ? { price: changes.price } : {}),
+      };
+    });
 
     try {
       const res = await fetch("/api/seller/inventory", {
@@ -887,6 +1020,7 @@ ${blueprintNames}
                   <th className="px-4 py-3 font-medium">Креслення</th>
                   <th className="px-4 py-3 font-medium text-center">Запитано</th>
                   <th className="px-4 py-3 font-medium text-center">У вас є</th>
+                  <th className="px-4 py-3 font-medium text-center">Ціна</th>
                   <th className="px-4 py-3 font-medium text-center">Статус</th>
                   {!isArchived && order.status !== "closed" && (
                     <th className="px-4 py-3 font-medium text-center">Дії</th>
@@ -905,6 +1039,11 @@ ${blueprintNames}
                     </td>
                     <td className="px-4 py-3 text-center text-white">
                       {item.availableQty}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-neon-purple text-sm">
+                        {item.priceSnapshot ? formatItemPrice(item.priceSnapshot) : "Договірна"}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {getItemStatusBadge(item)}
@@ -1129,7 +1268,10 @@ ${blueprintNames}
           <>
             <div className="bg-dark-800 rounded-lg p-4 mb-6 border border-dark-600">
               <p className="text-sm text-gray-400">
-                Керуйте інвентарем ваших креслень нижче. Ви можете змінювати лише кількість.
+                Керуйте інвентарем ваших креслень. Встановіть кількість та ціну для кожної позиції.
+                <span className="block mt-1 text-xs text-gray-500">
+                  Ціна може бути: договірна, матеріали (пружини, насіння, качки), або обмін на інші креслення.
+                </span>
               </p>
             </div>
 
@@ -1252,12 +1394,14 @@ ${blueprintNames}
                         <th className="px-4 py-3 font-medium">Креслення</th>
                         <th className="px-4 py-3 font-medium w-24">Тип</th>
                         <th className="px-4 py-3 font-medium w-40 text-center">Кількість</th>
+                        <th className="px-4 py-3 font-medium w-32 text-center">Ціна</th>
                         <th className="px-4 py-3 font-medium w-24 text-center">Статус</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-600">
                       {filteredBlueprints.map((bp) => {
                         const quantity = getCurrentQuantity(bp);
+                        const price = getCurrentPrice(bp);
                         const hasChanges = pendingChanges.has(bp.id);
 
                         return (
@@ -1309,6 +1453,20 @@ ${blueprintNames}
                                   className="w-8 h-8 flex items-center justify-center bg-dark-700 border border-dark-600 rounded text-gray-400 hover:text-white hover:border-neon-cyan/40 transition-colors"
                                 >
                                   +
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center">
+                                <button
+                                  onClick={() => {
+                                    setEditingPriceId(bp.id);
+                                    setEditingPrice({ ...price });
+                                  }}
+                                  className="px-3 py-1.5 bg-dark-700 border border-dark-600 rounded text-sm text-white hover:border-neon-purple/50 transition-colors max-w-[180px] truncate"
+                                  title={formatItemPrice(price)}
+                                >
+                                  {formatItemPrice(price)}
                                 </button>
                               </div>
                             </td>
@@ -1421,6 +1579,238 @@ ${blueprintNames}
       {copyToast && (
         <div className="fixed bottom-4 right-4 px-4 py-2 bg-green-500/90 text-white rounded-lg shadow-lg text-sm font-medium animate-fade-in z-50">
           {copyToast}
+        </div>
+      )}
+
+      {/* Price editor modal */}
+      {editingPriceId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+          onClick={() => setEditingPriceId(null)}
+        >
+          <div
+            className="bg-dark-800 rounded-xl max-w-md w-full border border-dark-600 shadow-2xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between p-4 border-b border-dark-600 shrink-0">
+              <h3 className="text-lg font-bold text-white">Встановити ціну</h3>
+              <button
+                onClick={() => setEditingPriceId(null)}
+                className="p-1 text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="p-4 overflow-y-auto">
+              {/* Blueprint name */}
+              <div className="mb-4 p-3 bg-dark-700 rounded-lg">
+                <span className="text-white font-medium">
+                  {blueprints.find((b) => b.id === editingPriceId)?.name || editingPriceId}
+                </span>
+              </div>
+
+              {/* Price type selector */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-400 mb-2">
+                  Тип ціни
+                </label>
+                <select
+                  value={editingPrice.type}
+                  onChange={(e) => {
+                    const newType = e.target.value as PriceType;
+                    // Reset other fields when type changes
+                    if (newType === "Договірна") {
+                      setEditingPrice({ type: newType });
+                    } else if (newType === "Блюпринт(-и)") {
+                      setEditingPrice({ type: newType, tradeBlueprints: [] });
+                    } else if (newType === "Інші матеріали") {
+                      setEditingPrice({ type: newType, amount: 1, otherLabel: "" });
+                    } else {
+                      setEditingPrice({ type: newType, amount: 1 });
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-purple/50 focus:outline-none"
+                >
+                  {PRICE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount input for material types */}
+              {(editingPrice.type === "Пружини" ||
+                editingPrice.type === "Насіння" ||
+                editingPrice.type === "Качки" ||
+                editingPrice.type === "Інші матеріали") && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Кількість
+                  </label>
+                  <input
+                    type="number"
+                    value={editingPrice.amount || ""}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setEditingPrice({
+                        ...editingPrice,
+                        amount: isNaN(val) ? undefined : Math.max(1, Math.min(val, priceConfig?.amountMax || 999999)),
+                      });
+                    }}
+                    min={priceConfig?.amountMin || 1}
+                    max={priceConfig?.amountMax || 999999}
+                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-purple/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="Введіть кількість"
+                  />
+                </div>
+              )}
+
+              {/* Custom label for "Інші матеріали" */}
+              {editingPrice.type === "Інші матеріали" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Назва матеріалу
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPrice.otherLabel || ""}
+                    onChange={(e) => {
+                      setEditingPrice({
+                        ...editingPrice,
+                        otherLabel: e.target.value.slice(0, priceConfig?.otherLabelMaxLength || 40),
+                      });
+                    }}
+                    maxLength={priceConfig?.otherLabelMaxLength || 40}
+                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-purple/50 focus:outline-none"
+                    placeholder="Напр.: ARC, метал, дерево..."
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {(editingPrice.otherLabel || "").length}/{priceConfig?.otherLabelMaxLength || 40} символів
+                  </p>
+                </div>
+              )}
+
+              {/* Blueprint trade selector */}
+              {editingPrice.type === "Блюпринт(-и)" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Креслення для обміну
+                  </label>
+
+                  {/* Current trade blueprints */}
+                  {(editingPrice.tradeBlueprints || []).length > 0 && (
+                    <div className="mb-3 space-y-2">
+                      {editingPrice.tradeBlueprints?.map((tb, index) => {
+                        const bp = catalogBlueprints.find((b) => b.id === tb.blueprintId);
+                        return (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-dark-700 rounded-lg">
+                            <span className="flex-1 text-white text-sm truncate">
+                              {bp?.name || tb.blueprintId}
+                            </span>
+                            <input
+                              type="number"
+                              value={tb.qty}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                const newQty = isNaN(val) ? 1 : Math.max(1, Math.min(val, 999));
+                                const newTrade = [...(editingPrice.tradeBlueprints || [])];
+                                newTrade[index] = { ...newTrade[index], qty: newQty };
+                                setEditingPrice({ ...editingPrice, tradeBlueprints: newTrade });
+                              }}
+                              min={1}
+                              max={999}
+                              className="w-16 px-2 py-1 bg-dark-600 border border-dark-500 rounded text-center text-white text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button
+                              onClick={() => {
+                                const newTrade = editingPrice.tradeBlueprints?.filter((_, i) => i !== index);
+                                setEditingPrice({ ...editingPrice, tradeBlueprints: newTrade });
+                              }}
+                              className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add blueprint selector */}
+                  {(editingPrice.tradeBlueprints || []).length < (priceConfig?.tradeBlueprintsMax || 10) && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const bpId = e.target.value;
+                        if (!bpId) return;
+
+                        // Check if already added
+                        if (editingPrice.tradeBlueprints?.some((tb) => tb.blueprintId === bpId)) {
+                          return;
+                        }
+
+                        const bp = catalogBlueprints.find((b) => b.id === bpId);
+                        const newTrade = [
+                          ...(editingPrice.tradeBlueprints || []),
+                          { blueprintId: bpId, name: bp?.name, qty: 1 },
+                        ];
+                        setEditingPrice({ ...editingPrice, tradeBlueprints: newTrade });
+                      }}
+                      className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-purple/50 focus:outline-none"
+                    >
+                      <option value="">+ Додати креслення...</option>
+                      {catalogBlueprints
+                        .filter((bp) => !editingPrice.tradeBlueprints?.some((tb) => tb.blueprintId === bp.id))
+                        .map((bp) => (
+                          <option key={bp.id} value={bp.id}>
+                            {bp.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+
+                  <p className="mt-2 text-xs text-gray-500">
+                    Додано {(editingPrice.tradeBlueprints || []).length}/{priceConfig?.tradeBlueprintsMax || 10} креслень
+                  </p>
+                </div>
+              )}
+
+              {/* Preview */}
+              <div className="mb-4 p-3 bg-dark-700 rounded-lg border border-dark-600">
+                <span className="text-sm text-gray-400">Попередній перегляд: </span>
+                <span className="text-neon-purple font-medium">{formatItemPrice(editingPrice)}</span>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div className="flex gap-3 p-4 border-t border-dark-600 shrink-0">
+              <button
+                onClick={() => setEditingPriceId(null)}
+                className="flex-1 px-4 py-2 bg-dark-700 text-gray-300 border border-dark-600 rounded-lg text-sm font-medium hover:bg-dark-600 transition-colors"
+              >
+                Скасувати
+              </button>
+              <button
+                onClick={() => {
+                  if (editingPriceId) {
+                    updatePrice(editingPriceId, editingPrice);
+                    setEditingPriceId(null);
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-neon-purple/20 text-neon-purple border border-neon-purple/40 rounded-lg text-sm font-medium hover:bg-neon-purple/30 transition-colors"
+              >
+                Зберегти
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

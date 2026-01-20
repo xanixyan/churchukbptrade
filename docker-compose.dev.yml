@@ -1,8 +1,9 @@
 # Docker Compose for development
 #
 # Usage: docker-compose -f docker-compose.dev.yml up
-
-version: '3.8'
+#
+# Run tests:
+#   docker-compose -f docker-compose.dev.yml run --rm web npm run test:concurrency
 
 services:
   web:

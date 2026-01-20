@@ -36,6 +36,8 @@ export interface OrderItemClaim {
   blueprintId: string;
   blueprintName: string;
   requestedQty: number;
+  // Price snapshot from when item was added to cart (preserves agreed price)
+  priceSnapshot?: import("./types").ItemPrice;
   // Claim fields
   claimStatus: ItemClaimStatus;
   claimedBySellerId?: string;
@@ -47,6 +49,9 @@ export interface OrderItemClaim {
 
 // Stored order extends ProcessedOrder with claim tracking
 export interface StoredOrder extends ProcessedOrder {
+  // Buyer identity (for buyer cabinet)
+  buyerId?: string;           // Buyer's internal ID (if logged in)
+  buyerDiscordId?: string;    // Buyer's Discord ID (numeric)
   // Array of seller IDs that are linked to this order (can fulfill items)
   sellerIds: string[];
   // Order-level status (global - only "closed" when ALL items fulfilled or admin closes)
@@ -84,6 +89,8 @@ export interface SellerOrderView {
     requestedQty: number;
     available: boolean;
     availableQty: number;
+    // Price snapshot from when buyer added to cart
+    priceSnapshot?: import("./types").ItemPrice;
     // Claim info
     claimStatus: ItemClaimStatus;
     claimedByMe: boolean;
@@ -175,6 +182,8 @@ export function saveOrder(processedOrder: ProcessedOrder): StoredOrder {
           blueprintId: item.blueprintId,
           blueprintName: item.blueprintName,
           requestedQty: item.requestedQty,
+          // Copy price snapshot from seller group item (preserves agreed price)
+          priceSnapshot: item.priceSnapshot,
           claimStatus: "unclaimed",
         });
       }
@@ -289,6 +298,12 @@ export function getOrdersForSeller(sellerId: string): SellerOrderView[] {
       continue;
     }
 
+    // BUG FIX: Only show orders where this seller was explicitly included
+    // This ensures orders are only sent to the seller(s) the buyer selected
+    if (order.sellerIds && order.sellerIds.length > 0 && !order.sellerIds.includes(sellerId)) {
+      continue;
+    }
+
     // Check if this seller can see this order
     const sellerView = buildSellerOrderView(order, sellerId, seller.discordId);
 
@@ -318,6 +333,13 @@ export function getArchivedOrdersForSeller(sellerId: string): SellerOrderView[] 
   for (const order of allOrders) {
     const isGloballyClosed = order.status === "closed" || order.status === "cancelled";
     const isClosedByThisSeller = isOrderClosedBySeller(order, sellerId);
+
+    // BUG FIX: Only show orders where this seller was explicitly included
+    // This ensures archived orders are also filtered correctly
+    const wasTargetedSeller = !order.sellerIds || order.sellerIds.length === 0 || order.sellerIds.includes(sellerId);
+    if (!wasTargetedSeller) {
+      continue;
+    }
 
     // Show in archived if:
     // 1. Order is globally closed/cancelled AND seller had involvement, OR
@@ -419,6 +441,8 @@ function buildSellerOrderView(
       requestedQty: claim.requestedQty,
       available,
       availableQty: sellerQty,
+      // Include price snapshot so seller can see agreed price
+      priceSnapshot: claim.priceSnapshot,
       claimStatus: claim.claimStatus,
       claimedByMe: isClaimedByMe,
       claimedBySellerId: claim.claimedBySellerId,
@@ -656,7 +680,7 @@ export async function fulfillOrderItem(
 ): Promise<ClaimResult> {
   const filePath = getOrderFilePath(orderId);
 
-  return withFileLock(filePath, () => {
+  return withFileLock(filePath, async () => {
     const order = getOrderById(orderId);
     if (!order) {
       return { success: false, error: "Замовлення не знайдено" };
@@ -690,7 +714,7 @@ export async function fulfillOrderItem(
 
     // Decrease seller inventory
     const newQty = currentQty - quantityToFulfill;
-    const inventoryUpdated = updateSellerInventoryItem(sellerId, blueprintId, newQty);
+    const inventoryUpdated = await updateSellerInventoryItem(sellerId, blueprintId, newQty);
 
     if (!inventoryUpdated) {
       return { success: false, error: "Не вдалося оновити інвентар" };
@@ -723,7 +747,7 @@ export async function fulfillAllClaimedItems(
 ): Promise<ClaimResult> {
   const filePath = getOrderFilePath(orderId);
 
-  return withFileLock(filePath, () => {
+  return withFileLock(filePath, async () => {
     const order = getOrderById(orderId);
     if (!order) {
       return { success: false, error: "Замовлення не знайдено" };
@@ -761,7 +785,7 @@ export async function fulfillAllClaimedItems(
       const newQty = currentQty - quantityToFulfill;
 
       // Decrease inventory
-      const inventoryUpdated = updateSellerInventoryItem(sellerId, claim.blueprintId, newQty);
+      const inventoryUpdated = await updateSellerInventoryItem(sellerId, claim.blueprintId, newQty);
 
       if (!inventoryUpdated) {
         // Rollback is complex - for now, stop and report error
@@ -1174,4 +1198,101 @@ export function clearAllOrders(): { success: boolean; deletedCount: number; erro
     console.error("Error clearing all orders:", error);
     return { success: false, deletedCount: 0, error: "Не вдалося видалити замовлення" };
   }
+}
+
+// ============================================
+// BUYER ORDER VIEWS
+// ============================================
+
+// Order view for buyer (their own orders)
+export interface BuyerOrderView {
+  orderId: string;
+  buyerDiscordNick: string;
+  offer: string;
+  notes?: string;
+  isMultiSeller: boolean;
+  createdAt: string;
+  status: OrderStatus;
+  // Items summary
+  items: {
+    blueprintId: string;
+    blueprintName: string;
+    requestedQty: number;
+    claimStatus: ItemClaimStatus;
+    claimedBySellerDiscordId?: string;
+  }[];
+  // Summary
+  totalItems: number;
+  claimedItems: number;
+  fulfilledItems: number;
+  // Assigned seller info
+  assignedSellerDiscordId?: string;
+}
+
+/**
+ * Build buyer order view from stored order
+ */
+function buildBuyerOrderView(order: StoredOrder): BuyerOrderView {
+  const items = order.itemClaims.map((claim) => ({
+    blueprintId: claim.blueprintId,
+    blueprintName: claim.blueprintName,
+    requestedQty: claim.requestedQty,
+    claimStatus: claim.claimStatus,
+    claimedBySellerDiscordId: claim.claimedBySellerDiscordId,
+  }));
+
+  return {
+    orderId: order.orderId,
+    buyerDiscordNick: order.buyerDiscordNick,
+    offer: order.offer,
+    notes: order.notes,
+    isMultiSeller: order.isMultiSeller,
+    createdAt: order.createdAt,
+    status: order.status,
+    items,
+    totalItems: items.length,
+    claimedItems: items.filter((i) => i.claimStatus === "claimed" || i.claimStatus === "fulfilled").length,
+    fulfilledItems: items.filter((i) => i.claimStatus === "fulfilled").length,
+    assignedSellerDiscordId: order.assignedSellerDiscordId,
+  };
+}
+
+/**
+ * Get orders for a specific buyer by Discord ID
+ * Matches orders where buyerDiscordId matches, or buyerDiscordNick contains the Discord ID
+ */
+export function getOrdersForBuyer(buyerDiscordId: string): BuyerOrderView[] {
+  const orders = getAllOrders();
+
+  return orders
+    .filter((order) => {
+      // Primary match: buyerDiscordId field (new orders)
+      if (order.buyerDiscordId === buyerDiscordId) {
+        return true;
+      }
+      // Fallback: buyerDiscordNick contains the Discord ID (legacy orders)
+      if (order.buyerDiscordNick && order.buyerDiscordNick.includes(buyerDiscordId)) {
+        return true;
+      }
+      return false;
+    })
+    .map(buildBuyerOrderView);
+}
+
+/**
+ * Get active orders for a buyer (not closed/cancelled)
+ */
+export function getActiveOrdersForBuyer(buyerDiscordId: string): BuyerOrderView[] {
+  return getOrdersForBuyer(buyerDiscordId).filter(
+    (order) => order.status !== "closed" && order.status !== "cancelled"
+  );
+}
+
+/**
+ * Get archived orders for a buyer (closed/cancelled)
+ */
+export function getArchivedOrdersForBuyer(buyerDiscordId: string): BuyerOrderView[] {
+  return getOrdersForBuyer(buyerDiscordId).filter(
+    (order) => order.status === "closed" || order.status === "cancelled"
+  );
 }

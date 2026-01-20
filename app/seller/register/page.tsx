@@ -93,7 +93,7 @@ export default function SellerRegister() {
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="discordId" className="block text-sm text-gray-400 mb-2">
-                Discord ID
+                Discord нік
               </label>
               <input
                 id="discordId"
@@ -101,12 +101,12 @@ export default function SellerRegister() {
                 value={discordId}
                 onChange={(e) => setDiscordId(e.target.value)}
                 className="w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-cyan/50 focus:outline-none"
-                placeholder="Ваш Discord username або ID"
+                placeholder="your_username"
                 required
                 autoFocus
               />
               <p className="text-xs text-gray-500 mt-1">
-                Це буде використано для зв'язку з вами щодо замовлень
+                Літери, цифри, _, ., - (2–32 символи)
               </p>
             </div>
 

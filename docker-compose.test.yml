@@ -1,0 +1,19 @@
+# Docker Compose for running tests
+#
+# Usage:
+#   docker-compose -f docker-compose.test.yml run --rm test
+#
+# Or run specific test:
+#   docker-compose -f docker-compose.test.yml run --rm test npm run test:concurrency
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run test:concurrency

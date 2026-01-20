@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create session
-    await createSellerSession(authResult.seller.id);
+    await createSellerSession(authResult.seller.id, authResult.seller.discordId);
 
     return NextResponse.json({
       success: true,

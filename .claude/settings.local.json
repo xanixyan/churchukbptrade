@@ -30,7 +30,13 @@
       "Bash(New-Item -ItemType Directory -Path \"F:\\\\sellingplace miltiacc\\\\app\\\\api\\\\admin\\\\orders\" -Force)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run test:concurrency:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

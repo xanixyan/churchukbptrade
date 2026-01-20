@@ -144,7 +144,7 @@ export async function PUT(request: NextRequest) {
             { status: 400 }
           );
         }
-        const updated = updateSellerStatus(sellerId, value as SellerStatus);
+        const updated = await updateSellerStatus(sellerId, value as SellerStatus);
         return NextResponse.json({
           success: true,
           seller: updated,
@@ -153,7 +153,7 @@ export async function PUT(request: NextRequest) {
 
       case "updateTelegramChatId": {
         const telegramChatId = typeof value === "string" ? value.trim() : undefined;
-        const updated = updateSellerTelegramChatId(sellerId, telegramChatId || undefined);
+        const updated = await updateSellerTelegramChatId(sellerId, telegramChatId || undefined);
         return NextResponse.json({
           success: true,
           seller: updated,
@@ -168,7 +168,7 @@ export async function PUT(request: NextRequest) {
           );
         }
         try {
-          const updated = updateSellerDiscordId(sellerId, value.trim());
+          const updated = await updateSellerDiscordId(sellerId, value.trim());
           return NextResponse.json({
             success: true,
             seller: updated,
@@ -192,7 +192,7 @@ export async function PUT(request: NextRequest) {
         }
 
         const updates = value as { blueprintId: string; quantity: number }[];
-        const success = updateSellerInventoryBulk(sellerId, updates);
+        const success = await updateSellerInventoryBulk(sellerId, updates);
 
         if (!success) {
           return NextResponse.json(
