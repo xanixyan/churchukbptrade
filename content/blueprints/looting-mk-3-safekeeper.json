@@ -1,0 +1,11 @@
+{
+  "id": "BP-081",
+  "name": "Looting Mk. 3 (Safekeeper)",
+  "slug": "looting-mk-3-safekeeper",
+  "image": "/blueprints/looting-mk-3-safekeeper.webp",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-30T12:00:00.000Z"
+}

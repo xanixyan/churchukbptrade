@@ -1,0 +1,11 @@
+{
+  "id": "BP-082",
+  "name": "Tactical Mk. 3 (Revival)",
+  "slug": "tactical-mk-3-revival",
+  "image": "/blueprints/tactical-mk-3-revival.webp",
+  "type": "Augments",
+  "owned": false,
+  "ownedQty": 0,
+  "notes": "",
+  "updatedAt": "2026-01-30T12:00:00.000Z"
+}
