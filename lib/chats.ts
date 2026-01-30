@@ -92,6 +92,11 @@ export function isOrderFinished(order: StoredOrder): boolean {
   return order.status === "completed" || order.status === "closed" || order.status === "cancelled";
 }
 
+/** Chat is only available after a seller has accepted/claimed (status moves past "open"). */
+export function isOrderAcceptedForChat(order: StoredOrder): boolean {
+  return order.status === "in_progress";
+}
+
 function getFulfillingSeller(order: StoredOrder): { sellerId: string; sellerDiscordId: string } | null {
   if (order.assignedSellerId && order.assignedSellerDiscordId) {
     return { sellerId: order.assignedSellerId, sellerDiscordId: order.assignedSellerDiscordId };
@@ -171,6 +176,9 @@ export function authorizeChatAccess(
   if (isOrderFinished(order)) {
     return { authorized: false, error: "Замовлення завершено, чат недоступний" };
   }
+  if (!isOrderAcceptedForChat(order)) {
+    return { authorized: false, error: "Чат доступний після прийняття замовлення продавцем" };
+  }
 
   if (userRole === "buyer") {
     const isBuyerOwner =
@@ -210,6 +218,9 @@ export function getOrCreateChat(order: StoredOrder): ChatRecord | null {
     }
     return existing;
   }
+
+  // Only create chat after seller has accepted the order
+  if (!isOrderAcceptedForChat(order)) return null;
 
   const fulfilling = getFulfillingSeller(order);
   if (!fulfilling) return null;
@@ -288,6 +299,9 @@ export async function addChatMessage(
     const order = getOrderById(orderId);
     if (!order || isOrderFinished(order)) {
       return { success: false, error: "Замовлення завершено, чат недоступний" };
+    }
+    if (!isOrderAcceptedForChat(order)) {
+      return { success: false, error: "Чат доступний після прийняття замовлення продавцем" };
     }
 
     let chat = getChat(orderId);
@@ -423,6 +437,7 @@ export function listChatsForUser(
 
   for (const order of allOrders) {
     if (isOrderFinished(order)) continue;
+    if (!isOrderAcceptedForChat(order)) continue;
 
     const fulfilling = getFulfillingSeller(order);
     if (!fulfilling) continue;
