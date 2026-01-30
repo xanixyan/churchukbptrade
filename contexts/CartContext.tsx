@@ -41,6 +41,7 @@ interface CartContextType {
   allNegotiableItemsHaveOffers: boolean;
   getItemsByBlueprint: (blueprintId: string) => CartItem[];
   getItemsBySeller: (sellerId: string) => CartItem[];
+  getQtyInCart: (blueprintId: string, sellerId: string) => number;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -144,15 +145,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const closeCart = useCallback(() => setIsCartOpen(false), []);
   const toggleCart = useCallback(() => setIsCartOpen((prev) => !prev), []);
 
-  // Multi-select mode operations
+  // Multi-select mode operations (decoupled from cart drawer)
   const enterMultiSelectMode = useCallback(() => {
     setIsMultiSelectMode(true);
-    setIsCartOpen(true);
   }, []);
 
   const exitMultiSelectMode = useCallback(() => {
     setIsMultiSelectMode(false);
-    setIsCartOpen(false);
   }, []);
 
   // Computed values
@@ -187,6 +186,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
+  // Get total quantity in cart for a specific blueprint + seller combination
+  const getQtyInCart = useCallback(
+    (blueprintId: string, sellerId: string): number => {
+      return items
+        .filter((item) => item.blueprintId === blueprintId && item.sellerId === sellerId)
+        .reduce((sum, item) => sum + item.quantity, 0);
+    },
+    [items]
+  );
+
   const value: CartContextType = {
     items,
     isCartOpen,
@@ -207,6 +216,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     allNegotiableItemsHaveOffers,
     getItemsByBlueprint,
     getItemsBySeller,
+    getQtyInCart,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

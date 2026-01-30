@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Blueprint, SellerListing, ItemPrice, formatItemPrice } from "@/lib/types";
+import { Blueprint, SellerListing, ItemPrice } from "@/lib/types";
 import { useCart } from "@/contexts/CartContext";
+import SellerList, { SellerWithEffective } from "./SellerList";
 
 interface SellerSelection {
   sellerId: string;
@@ -25,10 +26,9 @@ export default function SellerPickerModal({
   onClose,
   initialQuantity = 1,
 }: SellerPickerModalProps) {
-  const { addItem } = useCart();
+  const { addItem, getQtyInCart } = useCart();
 
   const [sellers, setSellers] = useState<SellerListing[]>([]);
-  const [recommendedSellerId, setRecommendedSellerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,9 +52,6 @@ export default function SellerPickerModal({
 
         const data = await res.json();
         setSellers(data.sellers || []);
-        if (data.recommendedSeller) {
-          setRecommendedSellerId(data.recommendedSeller.sellerId);
-        }
       } catch (err) {
         setError("Не вдалося завантажити продавців");
         console.error(err);
@@ -68,6 +65,37 @@ export default function SellerPickerModal({
     setRequestedQuantity(initialQuantity);
   }, [isOpen, blueprint.id, initialQuantity]);
 
+  // Calculate effective available for each seller (accounting for cart)
+  const getEffectiveAvailable = useCallback(
+    (sellerId: string, sellerStock: number): number => {
+      const qtyInCart = getQtyInCart(blueprint.id, sellerId);
+      return Math.max(0, sellerStock - qtyInCart);
+    },
+    [getQtyInCart, blueprint.id]
+  );
+
+  // Filter sellers to only those with effective available > 0
+  const availableSellers = useMemo((): SellerWithEffective[] => {
+    return sellers
+      .map((seller) => ({
+        ...seller,
+        effectiveAvailable: getEffectiveAvailable(seller.sellerId, seller.quantity),
+        qtyInCart: getQtyInCart(blueprint.id, seller.sellerId),
+      }))
+      .filter((seller) => seller.effectiveAvailable > 0);
+  }, [sellers, getEffectiveAvailable, getQtyInCart, blueprint.id]);
+
+  // Sellers that are fully in cart (for showing disabled state)
+  const sellersInCart = useMemo((): SellerWithEffective[] => {
+    return sellers
+      .map((seller) => ({
+        ...seller,
+        effectiveAvailable: getEffectiveAvailable(seller.sellerId, seller.quantity),
+        qtyInCart: getQtyInCart(blueprint.id, seller.sellerId),
+      }))
+      .filter((seller) => seller.effectiveAvailable <= 0 && seller.qtyInCart > 0);
+  }, [sellers, getEffectiveAvailable, getQtyInCart, blueprint.id]);
+
   // Calculate total selected quantity
   const totalSelectedQuantity = useMemo(
     () => selections.reduce((sum, s) => sum + s.quantity, 0),
@@ -77,22 +105,25 @@ export default function SellerPickerModal({
   // Calculate remaining quantity to select
   const remainingQuantity = requestedQuantity - totalSelectedQuantity;
 
-  // Check if any single seller can fulfill the entire quantity
-  const canSingleSellerFulfill = useMemo(
-    () => sellers.some((s) => s.quantity >= requestedQuantity),
-    [sellers, requestedQuantity]
-  );
-
-  // Get maximum total available across all sellers
+  // Get maximum total available across all sellers (using effective available)
   const maxTotalAvailable = useMemo(
-    () => sellers.reduce((sum, s) => sum + s.quantity, 0),
-    [sellers]
+    () => availableSellers.reduce((sum, s) => sum + s.effectiveAvailable, 0),
+    [availableSellers]
   );
 
-  // Update seller selection
+  // Get current selection quantity for a seller
+  const getSellerQuantity = useCallback(
+    (sellerId: string): number => {
+      const selection = selections.find((s) => s.sellerId === sellerId);
+      return selection?.quantity || 0;
+    },
+    [selections]
+  );
+
+  // Update seller selection (using effective available)
   const updateSellerSelection = useCallback(
     (sellerId: string, quantity: number) => {
-      const seller = sellers.find((s) => s.sellerId === sellerId);
+      const seller = availableSellers.find((s) => s.sellerId === sellerId);
       if (!seller) return;
 
       setSelections((prev) => {
@@ -101,8 +132,8 @@ export default function SellerPickerModal({
           return prev.filter((s) => s.sellerId !== sellerId);
         }
 
-        // Clamp quantity to max available
-        const clampedQty = Math.min(quantity, seller.quantity);
+        // Clamp quantity to effective available (not raw stock)
+        const clampedQty = Math.min(quantity, seller.effectiveAvailable);
 
         const existingIndex = prev.findIndex((s) => s.sellerId === sellerId);
         if (existingIndex >= 0) {
@@ -122,32 +153,32 @@ export default function SellerPickerModal({
             sellerDiscordId: seller.sellerDiscordId,
             quantity: clampedQty,
             price: seller.price,
-            maxAvailable: seller.quantity,
+            maxAvailable: seller.effectiveAvailable,
           },
         ];
       });
     },
-    [sellers]
+    [availableSellers]
   );
 
-  // Quick select single seller for full quantity
+  // Quick select single seller for full quantity (using effective available)
   const selectSingleSeller = useCallback(
     (sellerId: string) => {
-      const seller = sellers.find((s) => s.sellerId === sellerId);
+      const seller = availableSellers.find((s) => s.sellerId === sellerId);
       if (!seller) return;
 
-      const qty = Math.min(requestedQuantity, seller.quantity);
+      const qty = Math.min(requestedQuantity, seller.effectiveAvailable);
       setSelections([
         {
           sellerId: seller.sellerId,
           sellerDiscordId: seller.sellerDiscordId,
           quantity: qty,
           price: seller.price,
-          maxAvailable: seller.quantity,
+          maxAvailable: seller.effectiveAvailable,
         },
       ]);
     },
-    [sellers, requestedQuantity]
+    [availableSellers, requestedQuantity]
   );
 
   // Handle confirm
@@ -175,11 +206,19 @@ export default function SellerPickerModal({
     onClose();
   }, [addItem, blueprint, selections, totalSelectedQuantity, requestedQuantity, onClose]);
 
-  // Get current selection for a seller
-  const getSellerSelection = useCallback(
-    (sellerId: string) => selections.find((s) => s.sellerId === sellerId),
-    [selections]
-  );
+  // ESC key and body scroll lock
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -209,7 +248,7 @@ export default function SellerPickerModal({
         </div>
 
         {/* Quantity selector */}
-        <div className="p-4 border-b border-dark-600 bg-dark-700/50">
+        <div className="p-4 border-b border-dark-600 bg-dark-700/50 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-400">Скільки потрібно:</span>
             <div className="flex items-center gap-2">
@@ -264,134 +303,28 @@ export default function SellerPickerModal({
           </div>
 
           {/* Warning if quantity cannot be fulfilled */}
-          {requestedQuantity > maxTotalAvailable && (
+          {requestedQuantity > maxTotalAvailable && maxTotalAvailable > 0 && (
             <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
               Загальна наявність: {maxTotalAvailable}. Зменшіть кількість.
-            </div>
-          )}
-
-          {/* Info about splitting */}
-          {!canSingleSellerFulfill && requestedQuantity <= maxTotalAvailable && (
-            <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-sm text-yellow-400">
-              Жоден продавець не має {requestedQuantity} шт. Оберіть кілька продавців.
             </div>
           )}
         </div>
 
         {/* Sellers list */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {isLoading && (
-            <div className="text-center py-8 text-gray-400">Завантаження...</div>
-          )}
-
-          {error && (
-            <div className="text-center py-8 text-red-400">{error}</div>
-          )}
-
-          {!isLoading && !error && sellers.length === 0 && (
-            <div className="text-center py-8 text-gray-400">
-              Немає продавців з цим кресленням
-            </div>
-          )}
-
-          {!isLoading && !error && sellers.length > 0 && (
-            <div className="space-y-3">
-              {sellers.map((seller) => {
-                const selection = getSellerSelection(seller.sellerId);
-                const isSelected = !!selection;
-                const canFulfillAll = seller.quantity >= requestedQuantity;
-
-                return (
-                  <div
-                    key={seller.sellerId}
-                    className={`p-4 rounded-lg border transition-all ${
-                      isSelected
-                        ? "bg-neon-cyan/10 border-neon-cyan/40"
-                        : "bg-dark-700 border-dark-600 hover:border-dark-500"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-white truncate">
-                            {seller.sellerDiscordId}
-                          </span>
-                          {canFulfillAll && (
-                            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
-                              Може виконати
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                          <span className="text-gray-400">
-                            В наявності:{" "}
-                            <span className="text-white">{seller.quantity}</span>
-                          </span>
-                          <span className="text-neon-purple">
-                            {formatItemPrice(seller.price)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Quick select button for single seller fulfillment */}
-                        {canFulfillAll && !isSelected && (
-                          <button
-                            onClick={() => selectSingleSeller(seller.sellerId)}
-                            className="px-3 py-1.5 bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40 rounded text-sm font-medium hover:bg-neon-cyan/30 transition-colors"
-                          >
-                            Обрати все
-                          </button>
-                        )}
-
-                        {/* Quantity controls */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() =>
-                              updateSellerSelection(
-                                seller.sellerId,
-                                (selection?.quantity || 0) - 1
-                              )
-                            }
-                            disabled={!isSelected}
-                            className="w-7 h-7 flex items-center justify-center bg-dark-600 border border-dark-500 rounded text-gray-400 hover:text-white hover:border-neon-cyan/40 transition-colors disabled:opacity-30"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            value={selection?.quantity || 0}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val)) {
-                                updateSellerSelection(seller.sellerId, val);
-                              }
-                            }}
-                            min={0}
-                            max={seller.quantity}
-                            className="w-12 px-1 py-1 bg-dark-600 border border-dark-500 rounded text-center text-white text-sm focus:border-neon-cyan/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            onClick={() =>
-                              updateSellerSelection(
-                                seller.sellerId,
-                                (selection?.quantity || 0) + 1
-                              )
-                            }
-                            disabled={(selection?.quantity || 0) >= seller.quantity}
-                            className="w-7 h-7 flex items-center justify-center bg-dark-600 border border-dark-500 rounded text-gray-400 hover:text-white hover:border-neon-cyan/40 transition-colors disabled:opacity-30"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <div className="flex-1 overflow-hidden p-4">
+          <SellerList
+            sellers={availableSellers}
+            sellersInCart={sellersInCart}
+            isLoading={isLoading}
+            error={error}
+            mode="multi"
+            getSellerQuantity={getSellerQuantity}
+            onUpdateQuantity={updateSellerSelection}
+            onSelectAll={selectSingleSeller}
+            requestedQuantity={requestedQuantity}
+            maxHeight="350px"
+            showAllInCartMessage={true}
+          />
         </div>
 
         {/* Footer */}

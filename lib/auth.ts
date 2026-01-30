@@ -7,7 +7,6 @@ import {
   Buyer,
   User,
   canSellerAccessDashboard,
-  isSellerPendingVerification,
   isSellerBlocked,
   getSellerStatusMessage,
 } from "./types";
@@ -195,14 +194,6 @@ export async function authenticateSeller(
     return {
       success: false,
       error: "Доступ до облікового запису заборонено",
-      statusMessage: getSellerStatusMessage(seller.status),
-    };
-  }
-
-  if (isSellerPendingVerification(seller)) {
-    return {
-      success: false,
-      error: "Обліковий запис очікує підтвердження",
       statusMessage: getSellerStatusMessage(seller.status),
     };
   }
@@ -657,7 +648,6 @@ export async function getSessionWithRoles(): Promise<{
   discordId?: string;
   sellerId?: string;
   seller?: Seller;
-  sellerPending?: boolean; // True if seller exists but is pending verification
   buyerId?: string;
   buyer?: Buyer;
 }> {
@@ -680,7 +670,6 @@ export async function getSessionWithRoles(): Promise<{
   // Build complete role/profile information
   let seller: Seller | undefined;
   let buyer: Buyer | undefined;
-  let sellerPending = false;
   const roles: UserRole[] = session.roles || [];
 
   // Get seller profile if sellerId exists
@@ -690,8 +679,6 @@ export async function getSessionWithRoles(): Promise<{
       if (canSellerAccessDashboard(s)) {
         seller = s;
         if (!roles.includes("seller")) roles.push("seller");
-      } else if (isSellerPendingVerification(s)) {
-        sellerPending = true;
       }
     }
   }
@@ -711,8 +698,6 @@ export async function getSessionWithRoles(): Promise<{
     if (s && canSellerAccessDashboard(s)) {
       seller = s;
       if (!roles.includes("seller")) roles.push("seller");
-    } else if (s && isSellerPendingVerification(s)) {
-      sellerPending = true;
     }
 
     const b = getBuyerByDiscordId(session.discordId);
@@ -749,7 +734,6 @@ export async function getSessionWithRoles(): Promise<{
     discordId: session.discordId,
     sellerId: seller?.id,
     seller,
-    sellerPending,
     buyerId: buyer?.id,
     buyer,
   };
@@ -770,7 +754,6 @@ export async function unifiedLogin(
   activeRole?: UserRole;
   seller?: Seller;
   buyer?: Buyer;
-  sellerPending?: boolean;
   error?: string;
 }> {
   // Try to authenticate as seller first (sellers have more restrictions)
@@ -781,7 +764,6 @@ export async function unifiedLogin(
   const roles: UserRole[] = [];
   let seller: Seller | undefined;
   let buyer: Buyer | undefined;
-  let sellerPending = false;
 
   // LAZY BACKFILL: If seller authenticated but no buyer exists, auto-create buyer profile
   if (sellerAuthResult.success && sellerAuthResult.seller && !buyerAuthResult.success) {
@@ -816,23 +798,11 @@ export async function unifiedLogin(
     if (canSellerAccessDashboard(sellerAuthResult.seller)) {
       roles.push("seller");
       seller = sellerAuthResult.seller;
-    } else if (isSellerPendingVerification(sellerAuthResult.seller)) {
-      sellerPending = true;
-      // LAZY BACKFILL: Even pending sellers should get buyer access
-      // If we created a buyer profile above, they can still use buyer features
     }
   }
 
   // If no roles available, return error
   if (roles.length === 0) {
-    // Return most specific error message
-    if (sellerPending) {
-      return {
-        success: false,
-        sellerPending: true,
-        error: "Обліковий запис продавця очікує підтвердження",
-      };
-    }
     // Generic error for security
     return {
       success: false,
@@ -864,7 +834,6 @@ export async function unifiedLogin(
     activeRole,
     seller,
     buyer,
-    sellerPending,
   };
 }
 

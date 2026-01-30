@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useCart } from "@/contexts/CartContext";
 import { formatItemPrice } from "@/lib/types";
@@ -13,12 +13,10 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
   const {
     items,
     isCartOpen,
-    isMultiSelectMode,
     removeItem,
     updateItemQuantity,
     clearCart,
     closeCart,
-    exitMultiSelectMode,
     totalItems,
     totalQuantity,
   } = useCart();
@@ -35,18 +33,43 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
     return Array.from(groups.entries());
   }, [items]);
 
+  // ESC key handler
+  const handleEsc = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      closeCart();
+    }
+  }, [closeCart]);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isCartOpen) return;
+    document.addEventListener("keydown", handleEsc);
+
+    // Click-outside-to-close: mousedown so the click still reaches the underlying target.
+    // Skip clicks on [data-cart-toggle] buttons — those handle their own toggle logic.
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-cart-toggle]")) return;
+      if (panelRef.current && !panelRef.current.contains(target)) {
+        closeCart();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCartOpen, handleEsc, closeCart]);
+
   if (!isCartOpen) return null;
 
   return (
     <>
-      {/* Backdrop for mobile */}
+      {/* Panel — non-modal side panel, no blocking overlay */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-        onClick={closeCart}
-      />
-
-      {/* Panel */}
-      <div
+        ref={panelRef}
         className={`fixed right-0 top-0 bottom-0 w-full max-w-md bg-dark-800 border-l border-dark-600 z-50 flex flex-col shadow-2xl ${className}`}
       >
         {/* Header */}
@@ -73,9 +96,9 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
             )}
           </div>
           <button
-            onClick={isMultiSelectMode ? exitMultiSelectMode : closeCart}
+            onClick={closeCart}
             className="p-2 text-gray-400 hover:text-white transition-colors"
-            title={isMultiSelectMode ? "Завершити вибір" : "Закрити"}
+            title="Закрити"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -141,9 +164,13 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-400">Продавець:</span>
-                              <span className="text-sm text-white font-medium truncate">
+                              <Link
+                                href={`/sellers/${item.sellerId}`}
+                                className="text-sm text-white font-medium truncate hover:text-neon-cyan transition-colors"
+                                title="Переглянути профіль продавця"
+                              >
                                 {item.sellerDiscordId}
-                              </span>
+                              </Link>
                             </div>
                             <div className="text-sm text-neon-purple mt-1">
                               {formatItemPrice(item.priceSnapshot)}
@@ -154,7 +181,7 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                              className="w-6 h-6 flex items-center justify-center bg-dark-600 border border-dark-500 rounded text-gray-400 hover:text-white hover:border-red-400/40 transition-colors text-sm"
+                              className="w-7 h-7 flex items-center justify-center bg-dark-600 border border-dark-500 rounded text-gray-400 hover:text-white hover:border-red-400/40 transition-colors text-sm"
                             >
                               -
                             </button>
@@ -163,7 +190,7 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
                             </span>
                             <button
                               onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                              className="w-6 h-6 flex items-center justify-center bg-dark-600 border border-dark-500 rounded text-gray-400 hover:text-white hover:border-neon-cyan/40 transition-colors text-sm"
+                              className="w-7 h-7 flex items-center justify-center bg-dark-600 border border-dark-500 rounded text-gray-400 hover:text-white hover:border-neon-cyan/40 transition-colors text-sm"
                             >
                               +
                             </button>
@@ -229,9 +256,6 @@ export default function CartPanel({ className = "" }: CartPanelProps) {
                 href="/checkout"
                 className="flex-1 px-4 py-2.5 bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40 rounded-lg text-sm font-medium hover:bg-neon-cyan/30 transition-colors text-center"
                 onClick={() => {
-                  if (isMultiSelectMode) {
-                    exitMultiSelectMode();
-                  }
                   closeCart();
                 }}
               >

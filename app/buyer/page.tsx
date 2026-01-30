@@ -15,6 +15,7 @@ interface OrderItem {
   requestedQty: number;
   claimStatus: ItemClaimStatus;
   claimedBySellerDiscordId?: string;
+  publicNoteSnapshot?: string | null;
 }
 
 interface BuyerOrder {
@@ -276,7 +277,7 @@ export default function BuyerDashboard() {
                     <div className="flex-1 min-w-0">
                       {/* Order ID and status */}
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="font-mono text-sm text-gray-400">
+                        <span className="font-mono text-sm text-gray-400 break-all">
                           {order.orderId}
                         </span>
                         <span
@@ -375,26 +376,33 @@ export default function BuyerDashboard() {
                           return (
                             <div
                               key={idx}
-                              className="flex items-center justify-between p-3 bg-dark-700 rounded-lg"
+                              className="p-3 bg-dark-700 rounded-lg"
                             >
-                              <div className="flex items-center gap-3">
-                                <span className="text-white">
-                                  {item.blueprintName}
-                                </span>
-                                <span className="text-gray-500">
-                                  ×{item.requestedQty}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                {item.claimedBySellerDiscordId && (
-                                  <span className="text-xs text-gray-500">
-                                    {item.claimedBySellerDiscordId}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-white">
+                                    {item.blueprintName}
                                   </span>
-                                )}
-                                <span className={`text-sm ${itemStatusConfig.color}`}>
-                                  {itemStatusConfig.label}
-                                </span>
+                                  <span className="text-gray-500">
+                                    ×{item.requestedQty}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  {item.claimedBySellerDiscordId && (
+                                    <span className="text-xs text-gray-500">
+                                      {item.claimedBySellerDiscordId}
+                                    </span>
+                                  )}
+                                  <span className={`text-sm ${itemStatusConfig.color}`}>
+                                    {itemStatusConfig.label}
+                                  </span>
+                                </div>
                               </div>
+                              {item.publicNoteSnapshot && (
+                                <p className="mt-1.5 text-xs text-gray-500 border-l-2 border-neon-purple/30 pl-2">
+                                  {item.publicNoteSnapshot}
+                                </p>
+                              )}
                             </div>
                           );
                         })}

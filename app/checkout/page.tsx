@@ -24,9 +24,20 @@ export default function CheckoutPage() {
   const [globalNotes, setGlobalNotes] = useState("");
   const [honeypot, setHoneypot] = useState("");
 
+  // Stock issue from server
+  interface StockIssue {
+    blueprintId: string;
+    blueprintName: string;
+    sellerId: string;
+    sellerDiscordId: string;
+    requestedQty: number;
+    availableQty: number;
+  }
+
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [stockIssues, setStockIssues] = useState<StockIssue[]>([]);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [orderIds, setOrderIds] = useState<string[]>([]);
 
@@ -92,6 +103,16 @@ export default function CheckoutPage() {
     return true;
   }, [items.length, isLoggedInBuyer, discordNick, allNegotiableItemsHaveOffers]);
 
+  // Check if a specific item has a stock issue
+  const getItemStockIssue = useCallback(
+    (blueprintId: string, sellerId: string) => {
+      return stockIssues.find(
+        (issue) => issue.blueprintId === blueprintId && issue.sellerId === sellerId
+      );
+    },
+    [stockIssues]
+  );
+
   // Handle offer change for an item
   const handleOfferChange = useCallback(
     (itemId: string, offer: string) => {
@@ -114,6 +135,7 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setStockIssues([]);
 
     try {
       // Prepare order data
@@ -128,6 +150,7 @@ export default function CheckoutPage() {
           sellerDiscordId: item.sellerDiscordId,
           priceSnapshot: item.priceSnapshot,
           buyerOfferText: item.buyerOfferText?.trim() || undefined,
+          sellerPublicNote: item.sellerPublicNote || null,
         })),
         website: honeypot, // Honeypot field
       };
@@ -142,6 +165,12 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Check for structured OUT_OF_STOCK error
+        if (data.code === "OUT_OF_STOCK" && data.issues && Array.isArray(data.issues)) {
+          setStockIssues(data.issues);
+          setSubmitError(data.error || "Деякі товари закінчились");
+          return;
+        }
         throw new Error(data.error || "Помилка створення замовлення");
       }
 
@@ -269,7 +298,13 @@ export default function CheckoutPage() {
                         d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                       />
                     </svg>
-                    <span className="text-white font-medium">{group.sellerDiscordId}</span>
+                    <Link
+                      href={`/sellers/${group.sellerId}`}
+                      className="text-white font-medium hover:text-neon-cyan transition-colors"
+                      title="Переглянути профіль продавця"
+                    >
+                      {group.sellerDiscordId}
+                    </Link>
                     <span className="text-gray-500 text-sm">
                       ({group.items.length} {group.items.length === 1 ? "позиція" : "позицій"})
                     </span>
@@ -281,9 +316,13 @@ export default function CheckoutPage() {
                   {group.items.map((item) => {
                     const isNegotiable = !item.priceSnapshot || item.priceSnapshot.type === "Договірна";
                     const hasOffer = item.buyerOfferText && item.buyerOfferText.trim().length > 0;
+                    const stockIssue = getItemStockIssue(item.blueprintId, item.sellerId);
 
                     return (
-                      <div key={item.id} className="p-4">
+                      <div
+                        key={item.id}
+                        className={`p-4 ${stockIssue ? "bg-red-500/5 border-l-2 border-red-500" : ""}`}
+                      >
                         <div className="flex items-start gap-4">
                           {/* Image */}
                           {item.blueprintImage && (
@@ -296,7 +335,15 @@ export default function CheckoutPage() {
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-white">{item.blueprintName}</h3>
+                            <h3 className="font-medium text-white break-words">{item.blueprintName}</h3>
+
+                            {/* Stock issue warning */}
+                            {stockIssue && (
+                              <div className="mt-1 p-2 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
+                                Немає в наявності (є: {stockIssue.availableQty}, потрібно: {stockIssue.requestedQty})
+                              </div>
+                            )}
+
                             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm">
                               <span className="text-gray-400">
                                 Кількість: <span className="text-white">{item.quantity}</span>
@@ -305,6 +352,13 @@ export default function CheckoutPage() {
                                 {formatItemPrice(item.priceSnapshot)}
                               </span>
                             </div>
+
+                            {/* Seller's public note */}
+                            {item.sellerPublicNote && (
+                              <div className="mt-2 px-3 py-1.5 bg-dark-600/50 rounded text-xs text-gray-400 border-l-2 border-neon-purple/40">
+                                {item.sellerPublicNote}
+                              </div>
+                            )}
 
                             {/* Offer field */}
                             <div className="mt-3">
@@ -438,8 +492,38 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Error */}
-            {submitError && (
+            {/* Stock issues error */}
+            {stockIssues.length > 0 && (
+              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-red-400 font-medium">Деякі товари закінчились</span>
+                </div>
+                <div className="space-y-2">
+                  {stockIssues.map((issue, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-dark-700 rounded text-sm">
+                      <div>
+                        <span className="text-white">{issue.blueprintName}</span>
+                        <span className="text-gray-500 ml-2">({issue.sellerDiscordId})</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-red-400">
+                          Є: {issue.availableQty}, потрібно: {issue.requestedQty}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  Видаліть ці позиції з кошика або зменшіть кількість
+                </p>
+              </div>
+            )}
+
+            {/* General error */}
+            {submitError && stockIssues.length === 0 && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
                 {submitError}
               </div>

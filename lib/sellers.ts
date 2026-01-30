@@ -16,6 +16,7 @@ import {
   validateItemPrice,
   normalizeItemPrice,
   PRICE_TYPES,
+  SELLER_PUBLIC_NOTE_MAX_LENGTH,
 } from "./types";
 import { safeWriteJson, safeReadJson, withFileLock } from "./safe-file";
 
@@ -124,7 +125,7 @@ export function validateDiscordId(discordId: string): { valid: boolean; error?: 
 
 /**
  * Register a new seller account
- * Creates account with PENDING_VERIFICATION status
+ * Creates account with ACTIVE status (no admin approval needed)
  */
 export async function registerSeller(
   discordId: string,
@@ -158,7 +159,7 @@ export async function registerSeller(
     id: generateSellerId(),
     discordId: discordId.trim(),
     passwordHash,
-    status: "pending_verification", // New accounts require admin verification
+    status: "active",
     createdAt: now,
     updatedAt: now,
     inventory: [],
@@ -217,7 +218,7 @@ export function createSeller(discordId: string): Seller {
     id: generateSellerId(),
     discordId: discordId.trim(),
     passwordHash: "", // Admin-created accounts need password setup
-    status: "pending_verification", // Default: pending_verification until admin activates
+    status: "active",
     createdAt: now,
     updatedAt: now,
     inventory: [],
@@ -280,7 +281,25 @@ export function getSellerById(sellerId: string): SellerWithInventory | null {
   if (seller && !seller.inventory) {
     seller.inventory = [];
   }
+  // Read-time migration: comment -> publicNote
+  if (seller) {
+    migrateCommentToPublicNote(seller);
+  }
   return seller;
+}
+
+/**
+ * Read-time migration: rename legacy `comment` field to `publicNote`.
+ * Does NOT write to disk — caller is responsible for saving if needed.
+ */
+function migrateCommentToPublicNote(seller: SellerWithInventory): void {
+  if (!seller.inventory) return;
+  for (const item of seller.inventory) {
+    if (item.comment !== undefined && item.publicNote === undefined) {
+      item.publicNote = item.comment;
+      delete item.comment;
+    }
+  }
 }
 
 /**
@@ -317,6 +336,7 @@ export function getAllSellers(): SellerWithInventory[] {
       if (!seller.passwordHash) {
         seller.passwordHash = "";
       }
+      migrateCommentToPublicNote(seller);
       sellers.push(seller);
     }
   }
@@ -331,12 +351,6 @@ export function getActiveSellers(): SellerWithInventory[] {
   return getAllSellers().filter((s) => s.status === "active");
 }
 
-/**
- * Get sellers pending verification
- */
-export function getPendingVerificationSellers(): SellerWithInventory[] {
-  return getAllSellers().filter((s) => s.status === "pending_verification");
-}
 
 /**
  * Update seller status
@@ -701,6 +715,66 @@ export async function updateSellerInventoryPrice(
 }
 
 /**
+ * Update the public note for a specific inventory item.
+ * Seller can set, edit, or clear (null) their note.
+ * Uses file locking to prevent race conditions.
+ */
+export async function updateSellerPublicNote(
+  sellerId: string,
+  blueprintId: string,
+  publicNote: string | null
+): Promise<{ success: boolean; error?: string }> {
+  // Validate note
+  if (publicNote !== null) {
+    const trimmed = publicNote.trim();
+    if (trimmed.length === 0) {
+      publicNote = null; // empty/whitespace-only -> clear
+    } else if (trimmed.length > SELLER_PUBLIC_NOTE_MAX_LENGTH) {
+      return { success: false, error: `Нотатка занадто довга (макс. ${SELLER_PUBLIC_NOTE_MAX_LENGTH} символів)` };
+    } else {
+      // Escape HTML for safe rendering
+      publicNote = trimmed
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  }
+
+  const filePath = getSellerFilePath(sellerId);
+
+  return withFileLock(filePath, () => {
+    const seller = safeReadJson<SellerWithInventory>(filePath);
+    if (!seller) {
+      return { success: false, error: "Продавця не знайдено" };
+    }
+
+    if (!seller.inventory) {
+      seller.inventory = [];
+    }
+
+    // Apply migration for this seller
+    migrateCommentToPublicNote(seller);
+
+    const existingIndex = seller.inventory.findIndex((item) => item.blueprintId === blueprintId);
+
+    if (existingIndex < 0) {
+      seller.inventory.push({ blueprintId, quantity: 0, publicNote });
+    } else {
+      seller.inventory[existingIndex].publicNote = publicNote;
+      // Remove legacy field if present
+      delete seller.inventory[existingIndex].comment;
+    }
+
+    seller.updatedAt = new Date().toISOString();
+    safeWriteJson(filePath, seller);
+
+    return { success: true };
+  });
+}
+
+/**
  * Bulk update seller's inventory with quantity and price support.
  * Supports new ItemPrice structure.
  * Uses file locking to prevent race conditions.
@@ -887,6 +961,7 @@ export function getSellerListingsForBlueprint(blueprintId: string): SellerListin
         sellerDiscordId: seller.discordId,
         quantity: item.quantity,
         price: normalizeItemPrice(item.price),
+        publicNote: item.publicNote || null,
       });
     }
   }
@@ -1340,4 +1415,69 @@ export async function resetBlueprintQueue(blueprintId: string): Promise<void> {
  */
 export function getQueueState(): QueueState {
   return readQueueState();
+}
+
+// ============================================
+// PUBLIC SELLER PROFILE (Buyer-facing)
+// ============================================
+
+/**
+ * Public seller profile - safe for display to buyers
+ * Does NOT include passwordHash or other sensitive data
+ */
+export interface PublicSellerProfile {
+  id: string;
+  discordId: string;
+  status: SellerStatus;
+  createdAt: string;
+  inventory: {
+    blueprintId: string;
+    quantity: number;
+    price: ItemPrice;
+    publicNote?: string | null;
+  }[];
+}
+
+/**
+ * Get a seller's public profile by ID (internal UUID or Discord ID).
+ * Returns only public-safe data (no passwordHash).
+ * Only returns data for ACTIVE sellers.
+ */
+export function getPublicSellerProfile(identifier: string): PublicSellerProfile | null {
+  ensureDirectories();
+
+  // Try to find by internal ID first
+  let seller = getSellerById(identifier);
+
+  // If not found, try by Discord ID
+  if (!seller) {
+    seller = getSellerByDiscordId(identifier);
+  }
+
+  if (!seller) {
+    return null;
+  }
+
+  // Only return active sellers for public view
+  if (seller.status !== "active") {
+    return null;
+  }
+
+  // Filter inventory to only items with stock > 0
+  const publicInventory = seller.inventory
+    .filter((item) => item.quantity > 0)
+    .map((item) => ({
+      blueprintId: item.blueprintId,
+      quantity: item.quantity,
+      price: normalizeItemPrice(item.price),
+      publicNote: item.publicNote || null,
+    }));
+
+  return {
+    id: seller.id,
+    discordId: seller.discordId,
+    status: seller.status,
+    createdAt: seller.createdAt,
+    inventory: publicInventory,
+  };
 }

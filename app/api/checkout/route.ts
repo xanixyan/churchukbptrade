@@ -40,6 +40,7 @@ interface CheckoutItem {
   sellerDiscordId: string;
   priceSnapshot: ItemPrice;
   buyerOfferText?: string;
+  sellerPublicNote?: string | null; // Seller's public note snapshot from cart
 }
 
 // Checkout request body
@@ -55,6 +56,23 @@ interface ValidationResult {
   valid: boolean;
   error?: string;
   errors?: { field: string; message: string }[];
+}
+
+// Stock issue for structured error response
+interface StockIssue {
+  blueprintId: string;
+  blueprintName: string;
+  sellerId: string;
+  sellerDiscordId: string;
+  requestedQty: number;
+  availableQty: number;
+}
+
+// Stock validation result
+interface StockValidationResult {
+  valid: boolean;
+  issues: StockIssue[];
+  errors: string[]; // General errors (seller not found, etc.)
 }
 
 /**
@@ -134,11 +152,10 @@ function validateCheckoutRequest(
 }
 
 /**
- * Validate stock availability for all items
+ * Validate stock availability for all items (pre-check, NOT authoritative)
+ * The authoritative check happens inside validateAndDeductInventory with lock
  */
-async function validateStock(
-  items: CheckoutItem[]
-): Promise<{ valid: boolean; errors: string[] }> {
+function preValidateItems(items: CheckoutItem[]): { errors: string[] } {
   const errors: string[] = [];
 
   for (const item of items) {
@@ -165,19 +182,10 @@ async function validateStock(
     const blueprint = getBlueprintById(item.id);
     if (!blueprint) {
       errors.push(`Креслення "${item.name}" не знайдено`);
-      continue;
-    }
-
-    // Verify seller has enough stock
-    const availableQty = getSellerBlueprintQuantity(item.sellerId, item.id);
-    if (availableQty < item.quantity) {
-      errors.push(
-        `Недостатньо "${item.name}" у продавця "${seller.discordId}" (є: ${availableQty}, потрібно: ${item.quantity})`
-      );
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { errors };
 }
 
 /**
@@ -239,6 +247,7 @@ async function createOrdersForSellers(
         available: true, // Already validated
         availableQty: getSellerBlueprintQuantity(sellerId, item.id),
         priceSnapshot: normalizeItemPrice(item.priceSnapshot),
+        publicNoteSnapshot: item.sellerPublicNote || null,
       })),
     };
 
@@ -275,32 +284,61 @@ async function createOrdersForSellers(
 }
 
 /**
- * Deduct inventory for all items (should be called after order creation)
- * Uses file locking for atomicity
+ * ATOMIC: Validate stock AND deduct inventory in a single locked operation.
+ * This prevents race conditions where two buyers can both pass validation
+ * but then deplete stock for each other.
+ *
+ * If ANY item fails validation, NO deductions happen (all-or-nothing).
  */
-async function deductInventory(items: CheckoutItem[]): Promise<{ success: boolean; errors: string[] }> {
+async function validateAndDeductInventory(
+  items: CheckoutItem[]
+): Promise<{ success: boolean; issues: StockIssue[]; errors: string[] }> {
+  const issues: StockIssue[] = [];
   const errors: string[] = [];
   const DATA_DIR = path.join(process.cwd(), "data");
   const lockFile = path.join(DATA_DIR, "inventory-lock");
 
-  // Use a global lock for inventory operations to prevent race conditions
   try {
     await withFileLock(lockFile, async () => {
-      for (const item of items) {
-        const currentQty = getSellerBlueprintQuantity(item.sellerId, item.id);
+      // PHASE 1: Validate ALL items inside the lock
+      const validationData: { item: CheckoutItem; currentQty: number; seller: ReturnType<typeof getSellerById> }[] = [];
 
-        // Double-check stock (another request might have depleted it)
-        if (currentQty < item.quantity) {
-          errors.push(
-            `Недостатньо "${item.name}" (залишилось: ${currentQty}, потрібно: ${item.quantity})`
-          );
+      for (const item of items) {
+        const seller = getSellerById(item.sellerId);
+        if (!seller) {
+          errors.push(`Продавця "${item.sellerDiscordId}" не знайдено`);
           continue;
         }
 
+        const currentQty = getSellerBlueprintQuantity(item.sellerId, item.id);
+
+        if (currentQty < item.quantity) {
+          issues.push({
+            blueprintId: item.id,
+            blueprintName: item.name,
+            sellerId: item.sellerId,
+            sellerDiscordId: seller.discordId,
+            requestedQty: item.quantity,
+            availableQty: currentQty,
+          });
+        } else {
+          // Valid item - store for deduction
+          validationData.push({ item, currentQty, seller });
+        }
+      }
+
+      // If ANY item failed validation, abort without deducting anything
+      if (issues.length > 0 || errors.length > 0) {
+        return; // Lock will be released, no changes made
+      }
+
+      // PHASE 2: All items valid - deduct all stocks
+      for (const { item, currentQty } of validationData) {
         const newQty = currentQty - item.quantity;
         const updated = await updateSellerInventoryItem(item.sellerId, item.id, newQty);
 
         if (!updated) {
+          // This should not happen if validation passed, but handle it
           errors.push(`Не вдалося оновити інвентар для "${item.name}"`);
         }
       }
@@ -310,7 +348,11 @@ async function deductInventory(items: CheckoutItem[]): Promise<{ success: boolea
     errors.push("Не вдалося заблокувати інвентар для оновлення");
   }
 
-  return { success: errors.length === 0, errors };
+  return {
+    success: issues.length === 0 && errors.length === 0,
+    issues,
+    errors,
+  };
 }
 
 /**
@@ -429,29 +471,49 @@ export async function POST(request: NextRequest) {
       priceSnapshot: normalizeItemPrice(item.priceSnapshot),
     }));
 
-    // Validate stock
-    const stockValidation = await validateStock(items);
-    if (!stockValidation.valid) {
+    // Pre-validate items (seller exists, blueprint exists, seller can receive orders)
+    const preValidation = preValidateItems(items);
+    if (preValidation.errors.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: stockValidation.errors[0] || "Недостатньо товару",
-          stockErrors: stockValidation.errors,
+          error: preValidation.errors[0] || "Помилка перевірки",
+          errors: preValidation.errors,
         },
         { status: 400 }
       );
     }
 
-    // Deduct inventory FIRST (atomic operation with locking)
-    const inventoryResult = await deductInventory(items);
+    // ATOMIC: Validate stock AND deduct inventory in one locked operation
+    // This prevents race conditions where two buyers both pass validation
+    const inventoryResult = await validateAndDeductInventory(items);
     if (!inventoryResult.success) {
+      // Return structured OUT_OF_STOCK error
+      if (inventoryResult.issues.length > 0) {
+        const firstIssue = inventoryResult.issues[0];
+        const errorMessage = inventoryResult.issues.length === 1
+          ? `Недостатньо "${firstIssue.blueprintName}" у продавця ${firstIssue.sellerDiscordId} (є: ${firstIssue.availableQty}, потрібно: ${firstIssue.requestedQty})`
+          : `Недостатньо товару для ${inventoryResult.issues.length} позицій`;
+
+        return NextResponse.json(
+          {
+            success: false,
+            code: "OUT_OF_STOCK",
+            error: errorMessage,
+            issues: inventoryResult.issues,
+          },
+          { status: 400 }
+        );
+      }
+
+      // General errors (lock failure, etc.)
       return NextResponse.json(
         {
           success: false,
           error: inventoryResult.errors[0] || "Не вдалося оновити інвентар",
-          inventoryErrors: inventoryResult.errors,
+          errors: inventoryResult.errors,
         },
-        { status: 400 }
+        { status: 500 }
       );
     }
 

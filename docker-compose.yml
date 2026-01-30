@@ -1,16 +1,14 @@
-# Docker Compose for churchukbptrade
+# ============================================================================
+# churchukbptrade — Docker Compose (production)
+# ============================================================================
 #
-# Production:  docker-compose up -d
-# Development: docker-compose -f docker-compose.dev.yml up
+# Start:   docker compose up -d --build
+# Logs:    docker compose logs -f
+# Stop:    docker compose down
 #
-# Data persistence:
-# - ./content/blueprints: Blueprint catalog data
-# - ./data: Seller accounts and inventory data
-#
-# Cookie/Session Configuration (for external access):
-# - COOKIE_SECURE=false  : Required if accessing via HTTP (no HTTPS)
-# - COOKIE_SAMESITE=lax  : Default, allows external access
-# - COOKIE_DOMAIN        : Optional, for subdomain cookies
+# Data is persisted in ./data via bind mount.
+# Blueprint catalog is mounted from ./content/blueprints.
+# ============================================================================
 
 services:
   web:
@@ -18,23 +16,22 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "80:3000"
+      - "${APP_PORT:-80}:3000"
     environment:
       - NODE_ENV=production
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_ADMIN_CHAT_ID=${TELEGRAM_ADMIN_CHAT_ID}
       - TELEGRAM_GROUP_CHAT_ID=${TELEGRAM_GROUP_CHAT_ID}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      # Cookie settings for external access (HTTP port forwarding)
-      # Set COOKIE_SECURE=false if NOT using HTTPS
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
     env_file:
-      - .env.local
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     volumes:
-      # Blueprint catalog data (content/*.json files)
-      - ./content/blueprints:/app/content/blueprints
-      # Seller accounts and inventory data (IMPORTANT for multi-seller system)
+      - ./content/blueprints:/app/content/blueprints:ro
       - ./data:/app/data
     restart: unless-stopped
     healthcheck:
@@ -42,4 +39,4 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s

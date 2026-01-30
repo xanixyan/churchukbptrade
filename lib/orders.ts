@@ -9,6 +9,7 @@ import { safeWriteJson, safeReadJson, withFileLock } from "./safe-file";
 import { ProcessedOrder } from "./order";
 import { getSellerById, getSellerBlueprintQuantity, updateSellerInventoryItem } from "./sellers";
 import { canSellerReceiveOrders } from "./types";
+import { deleteChatForOrder } from "./chats";
 
 // Data directory for orders
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -38,6 +39,8 @@ export interface OrderItemClaim {
   requestedQty: number;
   // Price snapshot from when item was added to cart (preserves agreed price)
   priceSnapshot?: import("./types").ItemPrice;
+  // Seller's public note snapshot at time of order (preserved even if seller edits later)
+  publicNoteSnapshot?: string | null;
   // Claim fields
   claimStatus: ItemClaimStatus;
   claimedBySellerId?: string;
@@ -184,6 +187,8 @@ export function saveOrder(processedOrder: ProcessedOrder): StoredOrder {
           requestedQty: item.requestedQty,
           // Copy price snapshot from seller group item (preserves agreed price)
           priceSnapshot: item.priceSnapshot,
+          // Snapshot seller's public note at time of order
+          publicNoteSnapshot: item.publicNoteSnapshot || null,
           claimStatus: "unclaimed",
         });
       }
@@ -728,6 +733,7 @@ export async function fulfillOrderItem(
     const allFulfilled = order.itemClaims.every((c) => c.claimStatus === "fulfilled");
     if (allFulfilled) {
       order.status = "completed";
+      deleteChatForOrder(orderId);
     }
 
     updateOrder(order);
@@ -803,6 +809,7 @@ export async function fulfillAllClaimedItems(
     const allFulfilled = order.itemClaims.every((c) => c.claimStatus === "fulfilled");
     if (allFulfilled) {
       order.status = "completed";
+      deleteChatForOrder(orderId);
     }
 
     updateOrder(order);
@@ -839,6 +846,7 @@ export async function closeOrder(
       order.status = "closed";
       order.closedAt = new Date().toISOString();
       order.closedBySellerId = sellerId;
+      deleteChatForOrder(orderId);
       updateOrder(order);
       return { success: true };
     }
@@ -900,6 +908,7 @@ export async function closeOrder(
       order.status = "closed";
       order.closedAt = new Date().toISOString();
       order.closedBySellerId = sellerId;
+      deleteChatForOrder(orderId);
     }
 
     updateOrder(order);
@@ -928,6 +937,7 @@ export async function cancelOrder(
 
     order.status = "cancelled";
     order.closedAt = new Date().toISOString();
+    deleteChatForOrder(orderId);
 
     updateOrder(order);
 
@@ -1220,6 +1230,7 @@ export interface BuyerOrderView {
     requestedQty: number;
     claimStatus: ItemClaimStatus;
     claimedBySellerDiscordId?: string;
+    publicNoteSnapshot?: string | null;
   }[];
   // Summary
   totalItems: number;
@@ -1239,6 +1250,7 @@ function buildBuyerOrderView(order: StoredOrder): BuyerOrderView {
     requestedQty: claim.requestedQty,
     claimStatus: claim.claimStatus,
     claimedBySellerDiscordId: claim.claimedBySellerDiscordId,
+    publicNoteSnapshot: claim.publicNoteSnapshot || null,
   }));
 
   return {
@@ -1295,4 +1307,60 @@ export function getArchivedOrdersForBuyer(buyerDiscordId: string): BuyerOrderVie
   return getOrdersForBuyer(buyerDiscordId).filter(
     (order) => order.status === "closed" || order.status === "cancelled"
   );
+}
+
+// ============================================
+// PUBLIC SELLER ORDER STATS (Buyer-facing)
+// ============================================
+
+/**
+ * Public order statistics for a seller profile.
+ * Shows total orders and completed orders count.
+ */
+export interface PublicSellerOrderStats {
+  totalOrders: number;       // All orders where seller was involved
+  completedOrders: number;   // Orders where seller fulfilled all their items
+}
+
+/**
+ * Get public order statistics for a seller.
+ * Counts orders where the seller was targeted (in sellerIds) or claimed items.
+ */
+export function getPublicSellerOrderStats(sellerId: string): PublicSellerOrderStats {
+  const allOrders = getAllOrders();
+
+  let totalOrders = 0;
+  let completedOrders = 0;
+
+  for (const order of allOrders) {
+    // Check if seller was involved in this order
+    const wasTargeted = order.sellerIds && order.sellerIds.includes(sellerId);
+    const hadClaimedItems = order.itemClaims.some(
+      (claim) => claim.claimedBySellerId === sellerId
+    );
+
+    if (!wasTargeted && !hadClaimedItems) {
+      continue;
+    }
+
+    totalOrders++;
+
+    // Check if seller completed their part (all their claimed items fulfilled)
+    const sellerClaimedItems = order.itemClaims.filter(
+      (claim) => claim.claimedBySellerId === sellerId
+    );
+
+    // Seller "completed" if they claimed items AND all are fulfilled
+    // OR if order is completed/closed and they were the assigned seller
+    const allFulfilled = sellerClaimedItems.length > 0 &&
+      sellerClaimedItems.every((claim) => claim.claimStatus === "fulfilled");
+    const wasAssignedAndCompleted = order.assignedSellerId === sellerId &&
+      (order.status === "completed" || order.status === "closed");
+
+    if (allFulfilled || wasAssignedAndCompleted) {
+      completedOrders++;
+    }
+  }
+
+  return { totalOrders, completedOrders };
 }

@@ -22,6 +22,7 @@ interface BlueprintWithQuantity {
   type: BlueprintType;
   quantity: number;
   price: ItemPrice;
+  publicNote: string | null;
 }
 
 interface CatalogBlueprint {
@@ -135,6 +136,12 @@ export default function SellerDashboard() {
   // Copy toast state
   const [copyToast, setCopyToast] = useState<string | null>(null);
 
+  // Comment editing state
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentSaveStatus, setCommentSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const commentTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // New order notification hook
   const { initAudio, unlockAudio, processOrders, reset: resetNotifications } = useNewOrderNotification();
 
@@ -171,7 +178,65 @@ export default function SellerDashboard() {
     setTimeout(() => setCopyToast(null), 2000);
   }, []);
 
-  // Check auth on mount and redirect if buyer
+  // Save comment with debounce
+  const saveComment = useCallback(async (blueprintId: string, text: string) => {
+    const publicNote = text.trim().length === 0 ? null : text.trim();
+    setCommentSaveStatus("saving");
+    try {
+      const res = await fetch(`/api/seller/inventory/${blueprintId}/comment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicNote }),
+      });
+      if (res.ok) {
+        setCommentSaveStatus("saved");
+        setBlueprints(prev => prev.map(bp =>
+          bp.id === blueprintId ? { ...bp, publicNote } : bp
+        ));
+        setTimeout(() => setCommentSaveStatus("idle"), 2000);
+      } else {
+        setCommentSaveStatus("error");
+      }
+    } catch {
+      setCommentSaveStatus("error");
+    }
+  }, []);
+
+  const handleCommentChange = useCallback((blueprintId: string, text: string) => {
+    setCommentDraft(text);
+    setCommentSaveStatus("idle");
+    if (commentTimerRef.current) {
+      clearTimeout(commentTimerRef.current);
+    }
+    commentTimerRef.current = setTimeout(() => {
+      saveComment(blueprintId, text);
+    }, 800);
+  }, [saveComment]);
+
+  const openCommentEditor = useCallback((bp: BlueprintWithQuantity) => {
+    setEditingCommentId(bp.id);
+    setCommentDraft(bp.publicNote || "");
+    setCommentSaveStatus("idle");
+  }, []);
+
+  const closeCommentEditor = useCallback(() => {
+    if (commentTimerRef.current) {
+      clearTimeout(commentTimerRef.current);
+    }
+    // Save any unsaved draft immediately
+    if (editingCommentId && commentSaveStatus === "idle") {
+      const bp = blueprints.find(b => b.id === editingCommentId);
+      const currentComment = bp?.publicNote || "";
+      if (commentDraft.trim() !== currentComment) {
+        saveComment(editingCommentId, commentDraft);
+      }
+    }
+    setEditingCommentId(null);
+    setCommentDraft("");
+    setCommentSaveStatus("idle");
+  }, [editingCommentId, commentDraft, commentSaveStatus, blueprints, saveComment]);
+
+  // Check auth on mount and redirect if buyer or not authenticated
   useEffect(() => {
     // Wait for global auth to load
     if (globalAuthLoading) return;
@@ -179,6 +244,12 @@ export default function SellerDashboard() {
     // If logged in as buyer, redirect to buyer dashboard
     if (globalRole === "buyer") {
       router.push("/buyer");
+      return;
+    }
+
+    // If not authenticated as seller via global auth, redirect to unified login
+    if (globalRole !== "seller") {
+      router.push("/auth?mode=login");
       return;
     }
 
@@ -274,6 +345,8 @@ export default function SellerDashboard() {
       setArchivedOrders([]);
       // Reset notification tracking
       resetNotifications();
+      // Redirect to unified login page
+      router.push("/auth?mode=login");
     }
   };
 
@@ -737,8 +810,8 @@ export default function SellerDashboard() {
     );
   };
 
-  // Loading state
-  if (isAuthenticated === null) {
+  // Loading state (includes global auth loading)
+  if (globalAuthLoading || isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center">
         <div className="text-gray-400">Завантаження...</div>
@@ -746,87 +819,12 @@ export default function SellerDashboard() {
     );
   }
 
-  // Login form
+  // Not authenticated - redirect to unified login (fallback, should be handled by useEffect)
   if (!isAuthenticated) {
+    router.push("/auth?mode=login");
     return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="bg-dark-800 rounded-lg p-6 border border-dark-600">
-            <h1 className="text-xl font-bold text-white mb-2 text-center">Кабінет продавця</h1>
-            <p className="text-sm text-gray-400 mb-6 text-center">
-              Увійдіть, щоб отримати доступ до вашого інвентарю
-            </p>
-
-            <form onSubmit={handleLogin}>
-              <div className="mb-4">
-                <label htmlFor="discordId" className="block text-sm text-gray-400 mb-2">
-                  Discord ID
-                </label>
-                <input
-                  id="discordId"
-                  type="text"
-                  value={discordId}
-                  onChange={(e) => setDiscordId(e.target.value)}
-                  className="w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-cyan/50 focus:outline-none"
-                  placeholder="Ваш Discord username або ID"
-                  autoFocus
-                />
-              </div>
-
-              <div className="mb-4">
-                <label htmlFor="password" className="block text-sm text-gray-400 mb-2">
-                  Пароль
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-cyan/50 focus:outline-none"
-                  placeholder="Ваш пароль"
-                />
-              </div>
-
-              {authError && (
-                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                  {authError}
-                  {statusMessage && (
-                    <p className="mt-1 text-gray-400">{statusMessage}</p>
-                  )}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoggingIn || !discordId.trim() || !password}
-                className="w-full py-2 bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40 rounded-lg font-medium hover:bg-neon-cyan/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoggingIn ? "Вхід..." : "Увійти"}
-              </button>
-            </form>
-
-            <div className="mt-4 pt-4 border-t border-dark-600 text-center">
-              <p className="text-sm text-gray-400 mb-2">
-                Немає облікового запису?
-              </p>
-              <a
-                href="/seller/register"
-                className="text-sm text-neon-cyan hover:text-neon-cyan/80 transition-colors"
-              >
-                Зареєструватися як продавець
-              </a>
-            </div>
-
-            <div className="mt-4 text-center">
-              <a
-                href="/"
-                className="text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Повернутися до каталогу
-              </a>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <div className="text-gray-400">Перенаправлення...</div>
       </div>
     );
   }
@@ -1013,8 +1011,8 @@ ${blueprintNames}
           <h3 className="text-sm font-medium text-gray-400 mb-3">
             Позиції замовлення ({order.items.length})
           </h3>
-          <div className="bg-dark-700 rounded-lg overflow-hidden">
-            <table className="w-full">
+          <div className="bg-dark-700 rounded-lg overflow-hidden overflow-x-auto">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="bg-dark-600 text-left text-sm text-gray-400">
                   <th className="px-4 py-3 font-medium">Креслення</th>
@@ -1395,6 +1393,7 @@ ${blueprintNames}
                         <th className="px-4 py-3 font-medium w-24">Тип</th>
                         <th className="px-4 py-3 font-medium w-40 text-center">Кількість</th>
                         <th className="px-4 py-3 font-medium w-32 text-center">Ціна</th>
+                        <th className="px-4 py-3 font-medium w-10 text-center">Нотатка</th>
                         <th className="px-4 py-3 font-medium w-24 text-center">Статус</th>
                       </tr>
                     </thead>
@@ -1467,6 +1466,23 @@ ${blueprintNames}
                                   title={formatItemPrice(price)}
                                 >
                                   {formatItemPrice(price)}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={() => openCommentEditor(bp)}
+                                  className={`p-1.5 rounded transition-colors ${
+                                    bp.publicNote
+                                      ? "text-neon-purple hover:text-neon-purple/80"
+                                      : "text-gray-600 hover:text-gray-400"
+                                  }`}
+                                  title={bp.publicNote || "Додати нотатку"}
+                                >
+                                  <svg className="w-4 h-4" fill={bp.publicNote ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                  </svg>
                                 </button>
                               </div>
                             </td>
@@ -1573,6 +1589,7 @@ ${blueprintNames}
             )}
           </>
         )}
+
       </main>
 
       {/* Copy toast notification */}
@@ -1583,6 +1600,73 @@ ${blueprintNames}
       )}
 
       {/* Price editor modal */}
+      {/* Comment editor modal */}
+      {editingCommentId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+          onClick={closeCommentEditor}
+        >
+          <div
+            className="bg-dark-800 rounded-xl max-w-md w-full border border-dark-600 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-dark-600">
+              <h3 className="text-lg font-bold text-white">Публічна нотатка</h3>
+              <button
+                onClick={closeCommentEditor}
+                className="p-1 text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4">
+              <div className="mb-3 p-3 bg-dark-700 rounded-lg">
+                <span className="text-white font-medium">
+                  {blueprints.find((b) => b.id === editingCommentId)?.name || editingCommentId}
+                </span>
+              </div>
+
+              <textarea
+                value={commentDraft}
+                onChange={(e) => handleCommentChange(editingCommentId, e.target.value.slice(0, 500))}
+                placeholder="Публічна нотатка (видно покупцям)..."
+                rows={4}
+                maxLength={500}
+                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none resize-none text-sm"
+              />
+
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-500">
+                  {commentDraft.length}/500
+                </span>
+                <span className={`text-xs font-medium ${
+                  commentSaveStatus === "saving" ? "text-yellow-400" :
+                  commentSaveStatus === "saved" ? "text-green-400" :
+                  commentSaveStatus === "error" ? "text-red-400" :
+                  "text-transparent"
+                }`}>
+                  {commentSaveStatus === "saving" && "Збереження..."}
+                  {commentSaveStatus === "saved" && "Збережено"}
+                  {commentSaveStatus === "error" && (
+                    <button onClick={() => saveComment(editingCommentId, commentDraft)} className="underline">
+                      Помилка. Повторити
+                    </button>
+                  )}
+                  {commentSaveStatus === "idle" && "\u00A0"}
+                </span>
+              </div>
+
+              <p className="mt-3 text-xs text-yellow-500/80">
+                Ця нотатка публічна — покупці бачать її на сторінці товару та в замовленні.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingPriceId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"

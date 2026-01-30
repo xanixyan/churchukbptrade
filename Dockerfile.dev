@@ -1,40 +1,32 @@
 # ============================================================================
 # churchukbptrade - Development Dockerfile
 # ============================================================================
-# For local development with hot reload
+# Hot reload via volume mount. Source is bind-mounted at /app.
 #
-# Build:  docker build -f Dockerfile.dev -t churchukbptrade-dev .
-# Run:    docker run -p 3000:3000 -v ${PWD}:/app -v /app/node_modules churchukbptrade-dev
-#
-# Run tests:
-#   docker-compose -f docker-compose.dev.yml run --rm web npm run test:concurrency
+# Usage: docker compose -f docker-compose.dev.yml up --build
 # ============================================================================
 
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies for native modules (bcrypt requires build tools)
+# Build tools for bcrypt native module
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Copy package files
 COPY package.json package-lock.json* ./
 
 # Install all dependencies (including devDependencies)
 RUN npm install
 
-# Copy source (will be overwritten by volume mount)
+# Copy source (overwritten by bind mount at runtime)
 COPY . .
 
-# Create data directories with proper permissions
-RUN mkdir -p /app/data/sellers /app/data/orders
+# Create data directories
+RUN mkdir -p /app/data/sellers /app/data/orders /app/data/chats /app/data/users /app/data/buyers
 
-# Expose development port
 EXPOSE 3000
 
-# Set environment
 ENV NODE_ENV=development
 ENV HOSTNAME=0.0.0.0
 
-# Start development server
 CMD ["npm", "run", "dev"]

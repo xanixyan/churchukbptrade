@@ -28,7 +28,7 @@ export interface Blueprint {
 // ============================================
 
 // Seller account status
-export const SELLER_STATUSES = ["pending_verification", "active", "banned", "disabled"] as const;
+export const SELLER_STATUSES = ["active", "banned", "disabled"] as const;
 export type SellerStatus = (typeof SELLER_STATUSES)[number];
 
 // ============================================
@@ -89,12 +89,19 @@ export interface Seller {
   updatedAt: string; // ISO timestamp
 }
 
+// Public note validation constants
+export const SELLER_PUBLIC_NOTE_MAX_LENGTH = 500;
+
 // Seller's inventory for a specific blueprint
 export interface SellerInventoryItem {
   blueprintId: string; // References Blueprint.id
   quantity: number; // Available quantity (0 = not available)
   // New price structure (ItemPrice object)
   price?: ItemPrice | number | null; // ItemPrice object, or legacy number, or null/undefined
+  // Public seller note (visible to buyers on item pages, checkout, and order details)
+  publicNote?: string | null;
+  // Legacy field — migrated to publicNote on read
+  comment?: string | null;
 }
 
 // Seller with inventory data
@@ -185,11 +192,6 @@ export function canSellerModifyInventory(seller: Seller): boolean {
 // Check if seller can receive orders (only active sellers)
 export function canSellerReceiveOrders(seller: Seller): boolean {
   return seller.status === "active";
-}
-
-// Check if seller is pending verification
-export function isSellerPendingVerification(seller: Seller): boolean {
-  return seller.status === "pending_verification";
 }
 
 // Check if seller account is blocked (banned or disabled)
@@ -540,8 +542,6 @@ export function formatPrice(price: number | null | undefined, fallback = "Цін
 // Get human-readable status message for seller (Ukrainian)
 export function getSellerStatusMessage(status: SellerStatus): string {
   switch (status) {
-    case "pending_verification":
-      return "Ваш обліковий запис очікує перевірки адміністратором.";
     case "active":
       return "Ваш обліковий запис активний.";
     case "banned":
@@ -637,6 +637,7 @@ export interface SellerOrderGroup {
     available: boolean;
     availableQty: number;
     priceSnapshot?: ItemPrice; // Seller's price at time of order
+    publicNoteSnapshot?: string | null; // Seller's public note at time of order
   }[];
 }
 
@@ -653,6 +654,7 @@ export interface CartItem {
   quantity: number;
   priceSnapshot: ItemPrice; // Full price object snapshot at time of adding to cart
   buyerOfferText?: string;  // Per-item offer (required for negotiable, optional for others)
+  sellerPublicNote?: string | null; // Seller's public note snapshot at time of adding to cart
 }
 
 // Seller listing for product page - shows all sellers with stock
@@ -661,6 +663,7 @@ export interface SellerListing {
   sellerDiscordId: string;
   quantity: number;
   price: ItemPrice; // Full price object
+  publicNote?: string | null; // Seller's public note visible to buyers
 }
 
 // Order with resolved seller information

@@ -65,8 +65,7 @@ export default function SellerRegister() {
               </div>
               <h1 className="text-xl font-bold text-white mb-2">Реєстрація успішна</h1>
               <p className="text-sm text-gray-400 mb-6">
-                Ваш обліковий запис створено та очікує підтвердження адміністратором.
-                Ви зможете увійти після активації вашого облікового запису.
+                Ваш обліковий запис створено. Ви можете увійти та почати продавати.
               </p>
               <button
                 onClick={() => router.push("/seller")}
@@ -164,7 +163,7 @@ export default function SellerRegister() {
               Вже маєте обліковий запис?
             </p>
             <a
-              href="/seller"
+              href="/auth?mode=login"
               className="text-sm text-neon-cyan hover:text-neon-cyan/80 transition-colors"
             >
               Увійти тут

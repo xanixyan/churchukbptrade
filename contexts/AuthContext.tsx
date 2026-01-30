@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
 type UserRole = "buyer" | "seller" | "admin";
-type SellerStatus = "active" | "pending_verification" | "banned" | "disabled";
+type SellerStatus = "active" | "banned" | "disabled";
 
 interface UserInfo {
   id: string;
@@ -18,7 +18,6 @@ interface AuthState {
   user: UserInfo | null;
   sellerId: string | null; // Seller profile ID (if user has seller role)
   buyerId: string | null; // Buyer profile ID (if user has buyer role)
-  sellerPending: boolean; // True if seller account is pending verification
   isLoading: boolean;
 }
 
@@ -42,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     sellerId: null,
     buyerId: null,
-    sellerPending: false,
     isLoading: true,
   });
 
@@ -61,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: data.user || null,
         sellerId: data.sellerId || null,
         buyerId: data.buyerId || null,
-        sellerPending: data.sellerPending || false,
         isLoading: false,
       });
     } catch (error) {
@@ -73,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: null,
         sellerId: null,
         buyerId: null,
-        sellerPending: false,
         isLoading: false,
       });
     }
@@ -150,7 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: null,
       sellerId: null,
       buyerId: null,
-      sellerPending: false,
       isLoading: false,
     });
   }, []);

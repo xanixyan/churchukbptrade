@@ -102,7 +102,7 @@ export default function AdminPage() {
   const [editingSeller, setEditingSeller] = useState<SellerData | null>(null);
   const [editDiscordId, setEditDiscordId] = useState("");
   const [editTelegramChatId, setEditTelegramChatId] = useState("");
-  const [editStatus, setEditStatus] = useState<SellerStatus>("pending_verification");
+  const [editStatus, setEditStatus] = useState<SellerStatus>("active");
   const [isSavingSeller, setIsSavingSeller] = useState(false);
 
   // Seller inventory modal
@@ -415,7 +415,7 @@ export default function AdminPage() {
     setEditingSeller(null);
     setEditDiscordId("");
     setEditTelegramChatId("");
-    setEditStatus("pending_verification");
+    setEditStatus("active");
   };
 
   const saveSellerChanges = async () => {
@@ -593,8 +593,6 @@ export default function AdminPage() {
     switch (status) {
       case "active":
         return "bg-green-500/20 text-green-400 border-green-500/40";
-      case "pending_verification":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/40";
       case "banned":
         return "bg-red-500/20 text-red-400 border-red-500/40";
       case "disabled":
@@ -652,11 +650,6 @@ export default function AdminPage() {
       setSellerMessage("Помилка з'єднання");
     }
   };
-
-  // Count pending sellers
-  const pendingSellersCount = useMemo(() => {
-    return sellers.filter(s => s.status === "pending_verification").length;
-  }, [sellers]);
 
   // ============================================
   // ORDERS
@@ -984,22 +977,6 @@ export default function AdminPage() {
               </p>
             </div>
 
-            {/* Pending verification alert */}
-            {pendingSellersCount > 0 && (
-              <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
-                    <span className="text-yellow-400 font-bold">{pendingSellersCount}</span>
-                  </div>
-                  <div>
-                    <p className="text-yellow-400 font-medium">
-                      {pendingSellersCount} продавц{pendingSellersCount === 1 ? "ь" : "ів"} очікує підтвердження
-                    </p>
-                    <p className="text-sm text-yellow-400/70">Перегляньте та підтвердіть нові реєстрації продавців нижче</p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Messages */}
             {sellerMessage && (
@@ -1023,8 +1000,8 @@ export default function AdminPage() {
             {isLoadingSellers ? (
               <div className="text-center py-12 text-gray-400">Завантаження продавців...</div>
             ) : (
-              <div className="bg-dark-800 rounded-lg border border-dark-600 overflow-hidden">
-                <table className="w-full">
+              <div className="bg-dark-800 rounded-lg border border-dark-600 overflow-x-auto">
+                <table className="w-full min-w-[800px]">
                   <thead>
                     <tr className="bg-dark-700 text-left text-sm text-gray-400">
                       <th className="px-4 py-3 font-medium">Discord ID</th>
@@ -1066,15 +1043,7 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {seller.status === "pending_verification" && (
-                              <button
-                                onClick={() => approveSeller(seller.id)}
-                                className="px-3 py-1 bg-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/30 transition-colors"
-                              >
-                                Підтвердити
-                              </button>
-                            )}
-                            {seller.status !== "banned" && seller.status !== "pending_verification" && (
+                            {seller.status !== "banned" && (
                               <button
                                 onClick={() => banSeller(seller.id)}
                                 className="px-3 py-1 bg-red-500/20 text-red-400 rounded text-xs hover:bg-red-500/30 transition-colors"
@@ -1590,7 +1559,6 @@ export default function AdminPage() {
                   onChange={(e) => setEditStatus(e.target.value as SellerStatus)}
                   className="w-full px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:border-neon-cyan/50 focus:outline-none"
                 >
-                  <option value="pending_verification">Очікує підтвердження</option>
                   <option value="active">Активний</option>
                   <option value="disabled">Вимкнено</option>
                   <option value="banned">Заблоковано</option>

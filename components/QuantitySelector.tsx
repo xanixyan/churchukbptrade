@@ -46,8 +46,8 @@ export default function QuantitySelector({
     : "h-8 text-sm";
 
   const buttonClasses = size === "sm"
-    ? "w-6 h-6"
-    : "w-8 h-8";
+    ? "w-6 h-6 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
+    : "w-8 h-8 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0";
 
   const inputClasses = size === "sm"
     ? "w-8 text-xs"

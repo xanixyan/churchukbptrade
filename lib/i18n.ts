@@ -178,12 +178,10 @@ export const uk = {
   // SELLER STATUS
   // ============================================
   sellerStatus: {
-    pending_verification: "Ваш обліковий запис очікує перевірки адміністратором.",
     active: "Ваш обліковий запис активний.",
     banned: "Ваш обліковий запис заблоковано.",
     disabled: "Ваш обліковий запис вимкнено.",
     unknown: "Невідомий статус облікового запису.",
-    accountPending: "Обліковий запис очікує підтвердження",
     accountDenied: "Доступ до облікового запису заборонено",
   },
 
@@ -256,17 +254,11 @@ export const uk = {
     confirmDelete: "Ви впевнені, що хочете видалити цього продавця? Цю дію неможливо скасувати.",
     confirmBan: "Ви впевнені, що хочете заблокувати цього продавця?",
 
-    // Pending verification
-    pendingCount: "{count} продавців очікують підтвердження",
-    pendingCountSingular: "{count} продавець очікує підтвердження",
-    reviewPending: "Перегляньте та підтвердіть нові реєстрації продавців нижче",
-
     // Edit seller modal
     editSeller: "Редагувати продавця",
     telegramChatId: "Telegram Chat ID",
     telegramPlaceholder: "Для сповіщень про замовлення",
     statusLabel: "Статус",
-    statusPending: "Очікує підтвердження",
     statusActive: "Активний",
     statusDisabled: "Вимкнено",
     statusBanned: "Заблоковано",
@@ -385,8 +377,6 @@ export function t(key: string, params?: Record<string, string | number>): string
  */
 export function getSellerStatusMessageUk(status: string): string {
   switch (status) {
-    case "pending_verification":
-      return uk.sellerStatus.pending_verification;
     case "active":
       return uk.sellerStatus.active;
     case "banned":

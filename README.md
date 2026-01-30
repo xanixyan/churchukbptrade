@@ -103,23 +103,40 @@ Each blueprint is stored as a JSON file in `content/blueprints/`:
 
 ## Docker Deployment
 
-### Quick Start (Production)
+### Production
 
 ```bash
-# Build and run
-docker-compose up -d
+# Build and start (detached)
+docker compose up -d --build
 
-# Site is available at http://localhost:3000
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
 ```
 
-### Development with Docker
+The app is served on port **80** by default. Override with `APP_PORT`:
 
 ```bash
-# Run with hot reload
-docker-compose -f docker-compose.dev.yml up
-
-# Site is available at http://localhost:3000 with live reload
+APP_PORT=3000 docker compose up -d --build
 ```
+
+### Development (hot reload)
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+Site available at `http://localhost:3000` with live reload.
+File changes on the host are reflected immediately.
+
+### Data Persistence
+
+All runtime data (sellers, orders, chats, buyers, users) is stored in `./data/`
+and bind-mounted into the container. Data survives container restarts and rebuilds.
+
+Blueprint catalog files in `./content/blueprints/` are mounted read-only in production.
 
 ### Manual Docker Commands
 
@@ -127,29 +144,25 @@ docker-compose -f docker-compose.dev.yml up
 # Build production image
 docker build -t churchukbptrade .
 
-# Run container with environment variables
+# Run with env file and data volume
 docker run -d -p 3000:3000 \
-  -e TELEGRAM_BOT_TOKEN=your_token \
-  -e TELEGRAM_ADMIN_CHAT_ID=your_chat_id \
+  --env-file .env \
+  -v ./data:/app/data \
+  -v ./content/blueprints:/app/content/blueprints:ro \
   --name churchukbptrade \
   churchukbptrade
-
-# View logs
-docker logs churchukbptrade
-
-# Stop and remove
-docker stop churchukbptrade && docker rm churchukbptrade
 ```
 
 ### Docker Files
 
 | File | Purpose |
 |------|---------|
-| `Dockerfile` | Production multi-stage build |
+| `Dockerfile` | Production multi-stage build (standalone) |
 | `Dockerfile.dev` | Development with hot reload |
 | `docker-compose.yml` | Production orchestration |
 | `docker-compose.dev.yml` | Development orchestration |
-| `.dockerignore` | Files excluded from build |
+| `docker-compose.test.yml` | Test runner |
+| `.dockerignore` | Files excluded from build context |
 
 ## Deploy with Cloudflare
 

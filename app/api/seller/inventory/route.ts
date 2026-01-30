@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSellerSession } from "@/lib/auth";
+
+// Force dynamic — never cache seller-specific inventory data
+export const dynamic = "force-dynamic";
 import { getAllBlueprints } from "@/lib/blueprints";
 import {
   getSellerInventory,
@@ -39,15 +42,19 @@ export async function GET() {
     // Get seller's inventory
     const inventory = getSellerInventory(seller.id);
 
-    // Create inventory map for quick lookup (both quantity and price)
+    // Create inventory map for quick lookup (quantity, price, publicNote)
     const inventoryMap = new Map(
       inventory.map((item) => [
         item.blueprintId,
-        { quantity: item.quantity, price: normalizeItemPrice(item.price) }
+        {
+          quantity: item.quantity,
+          price: normalizeItemPrice(item.price),
+          publicNote: item.publicNote || null,
+        }
       ])
     );
 
-    // Combine blueprints with seller's quantities and prices
+    // Combine blueprints with seller's quantities, prices, and public notes
     const blueprintsWithInventory = blueprints.map((bp) => {
       const inv = inventoryMap.get(bp.id);
       return {
@@ -58,6 +65,7 @@ export async function GET() {
         type: bp.type,
         quantity: inv?.quantity || 0,
         price: inv?.price || { type: "Договірна" as const },
+        publicNote: inv?.publicNote || null,
       };
     });
 

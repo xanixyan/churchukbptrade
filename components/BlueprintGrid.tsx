@@ -7,7 +7,6 @@ import BlueprintCard from "./BlueprintCard";
 import CatalogControls from "./CatalogControls";
 import SelectionBar from "./SelectionBar";
 import CheckoutModal from "./CheckoutModal";
-import CartPanel from "./CartPanel";
 import SellerPickerModal from "./SellerPickerModal";
 import { useCart } from "@/contexts/CartContext";
 
@@ -26,7 +25,7 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Cart integration
-  const { isCartOpen, isMultiSelectMode, enterMultiSelectMode, totalItems: cartTotalItems } = useCart();
+  const { isCartOpen, isMultiSelectMode, enterMultiSelectMode, exitMultiSelectMode, openCart, totalItems: cartTotalItems } = useCart();
 
   // Seller picker modal state
   const [sellerPickerBlueprint, setSellerPickerBlueprint] = useState<Blueprint | null>(null);
@@ -139,6 +138,26 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
   const totalTypes = selections.length;
   const totalItems = useMemo(() => getTotalItemCount(selections), [selections]);
 
+  // Toggle multi-select cart mode
+  const handleToggleCartMode = useCallback(() => {
+    if (isMultiSelectMode) {
+      exitMultiSelectMode();
+    } else {
+      enterMultiSelectMode();
+    }
+  }, [isMultiSelectMode, enterMultiSelectMode, exitMultiSelectMode]);
+
+  // Proceed to cart: open cart drawer and exit multi-select
+  const handleProceedToCart = useCallback(() => {
+    exitMultiSelectMode();
+    openCart();
+  }, [exitMultiSelectMode, openCart]);
+
+  // Cancel multi-select without opening cart
+  const handleCancelMultiSelect = useCallback(() => {
+    exitMultiSelectMode();
+  }, [exitMultiSelectMode]);
+
   // Handle opening seller picker for a blueprint
   const handleOpenSellerPicker = useCallback((blueprint: Blueprint) => {
     setSellerPickerBlueprint(blueprint);
@@ -150,7 +169,7 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
   }, []);
 
   return (
-    <div className={`${selectMode && selections.length > 0 ? "pb-20" : ""} ${isCartOpen ? "lg:mr-[420px]" : ""} transition-all duration-300`}>
+    <div className={`${selectMode && selections.length > 0 ? "pb-20" : ""} ${isMultiSelectMode ? "pb-20" : ""} ${isCartOpen ? "lg:mr-[420px]" : ""} transition-all duration-300`}>
       <CatalogControls
         search={search}
         onSearchChange={setSearch}
@@ -166,7 +185,7 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
         selectedCount={totalTypes}
         // Cart mode props
         cartItemCount={cartTotalItems}
-        onEnterCartMode={enterMultiSelectMode}
+        onEnterCartMode={handleToggleCartMode}
         isCartMode={isMultiSelectMode}
       />
 
@@ -242,9 +261,6 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
         onSuccess={handleOrderSuccess}
       />
 
-      {/* Cart panel */}
-      <CartPanel />
-
       {/* Seller picker modal */}
       {sellerPickerBlueprint && (
         <SellerPickerModal
@@ -253,6 +269,35 @@ export default function BlueprintGrid({ blueprints }: BlueprintGridProps) {
           onClose={handleCloseSellerPicker}
           initialQuantity={1}
         />
+      )}
+
+      {/* Multi-select floating action bar */}
+      {isMultiSelectMode && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-dark-800 border-t border-dark-600 shadow-2xl px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-400">
+                Обрано:{" "}
+                <span className="text-neon-cyan font-bold">{cartTotalItems}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCancelMultiSelect}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-dark-600 rounded-lg transition-colors"
+              >
+                Скасувати
+              </button>
+              <button
+                onClick={handleProceedToCart}
+                disabled={cartTotalItems === 0}
+                className="px-5 py-2 text-sm font-medium bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40 rounded-lg hover:bg-neon-cyan/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Перейти до кошика
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

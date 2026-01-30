@@ -9,7 +9,7 @@ const REGISTER_RATE_LIMIT = { maxRequests: 3, windowMs: 15 * 60 * 1000 };
 
 /**
  * POST /api/seller/register - Seller Registration
- * Creates a new seller account with PENDING_VERIFICATION status
+ * Creates a new seller account with ACTIVE status
  */
 export async function POST(request: NextRequest) {
   try {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Обліковий запис створено. Очікуйте підтвердження від адміністратора.",
+      message: "Обліковий запис створено. Ви можете увійти та почати продавати.",
       seller: {
         id: result.seller.id,
         discordId: result.seller.discordId,

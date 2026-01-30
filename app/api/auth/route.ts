@@ -134,17 +134,6 @@ async function handleLogin(
   const loginResult = await unifiedLogin(discordId, password, role as UserRole);
 
   if (!loginResult.success) {
-    // Check if seller is pending verification
-    if (loginResult.sellerPending && role === "seller") {
-      return NextResponse.json(
-        {
-          error: "Обліковий запис продавця очікує підтвердження адміністратором",
-          statusMessage: "pending_verification",
-        },
-        { status: 401 }
-      );
-    }
-
     return NextResponse.json(
       { error: loginResult.error || "Невірні облікові дані" },
       { status: 401 }
@@ -172,7 +161,6 @@ async function handleLogin(
     // Include info about other available roles
     hasSellerRole: loginResult.roles?.includes("seller"),
     hasBuyerRole: loginResult.roles?.includes("buyer"),
-    sellerPending: loginResult.sellerPending,
   });
 }
 
@@ -286,7 +274,6 @@ async function handleRegister(
       },
       message: "Профіль покупця створено! Ви можете використовувати ті ж облікові дані.",
       hasSellerRole: existingSeller.status === "active",
-      sellerPending: existingSeller.status === "pending_verification",
     });
   }
 
@@ -349,7 +336,6 @@ export async function GET() {
       hasBuyerRole: session.roles?.includes("buyer"),
       sellerId: session.sellerId,
       buyerId: session.buyerId,
-      sellerPending: session.sellerPending,
     });
   } catch (error) {
     console.error("Session check error:", error);

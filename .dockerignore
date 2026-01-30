@@ -4,9 +4,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build output (will be rebuilt in container)
+# Build output (rebuilt in container)
 .next
 out
+
+# Runtime data (mounted as volume, never baked into image)
+data
 
 # Git
 .git
@@ -26,21 +29,21 @@ Thumbs.db
 logs
 *.log
 
-# Documentation (not needed in container)
-README.md
-CHANGELOG.md
-LICENSE
-
-# Development files
+# Docker files (not needed inside image)
+Dockerfile
 Dockerfile.dev
 docker-compose*.yml
+
+# Documentation (not needed in container)
+UI_AUDIT.md
+README.md
 
 # Temporary files
 *.tmp
 *.temp
 .cache
 
-# Test files
+# Test artifacts
 coverage
 .nyc_output
 
